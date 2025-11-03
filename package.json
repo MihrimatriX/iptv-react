@@ -1,0 +1,32 @@
+{
+  "name": "react-iptv-client",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "generate-icons": "node scripts/generate-icons.js",
+    "pwa-build": "npm run generate-icons && npm run build"
+  },
+  "dependencies": {
+    "clsx": "2.1.1",
+    "hls.js": "1.6.13",
+    "lucide-react": "0.545.0",
+    "next": "15.5.5",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.14",
+    "@types/node": "24.7.2",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "9.37.0",
+    "eslint-config-next": "15.5.5",
+    "postcss": "8.5.6",
+    "tailwindcss": "4.1.14",
+    "typescript": "5.9.3"
+  }
+}
