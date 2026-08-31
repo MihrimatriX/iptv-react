@@ -1,0 +1,31 @@
+services:
+  tv-service:
+    build: .
+    container_name: tv-service
+    ports:
+      - "3444:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # App URL Configuration
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://teve.ahmetfuzunkaya.com}
+      # Xtream API Configuration
+      XTREAM_API_BASE: ${XTREAM_API_BASE:-http://tgrpro25.xyz:8080/player_api.php}
+      XTREAM_USERNAME: ${XTREAM_USERNAME}
+      XTREAM_PASSWORD: ${XTREAM_PASSWORD}
+      XTREAM_SESSION_COOKIE: ${XTREAM_SESSION_COOKIE:-}
+      # Proxy Configuration
+      XTREAM_USER_AGENT: ${XTREAM_USER_AGENT:-Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0}
+      XTREAM_STREAM_REFERER: ${XTREAM_STREAM_REFERER:-}
+      # Debug Configuration
+      USE_DIRECT_STREAMING: ${USE_DIRECT_STREAMING:-false}
+    restart: unless-stopped
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    driver: bridge
+    external: true
