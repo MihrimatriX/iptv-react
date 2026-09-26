@@ -1,4 +1,4 @@
-# REACT IPTV CLIENT
+﻿# REACT IPTV CLIENT
 
 Modern IPTV streaming application built with Next.js and Xtream Codes API integration.
 
@@ -61,19 +61,19 @@ Modern IPTV streaming application built with Next.js and Xtream Codes API integr
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── api/               # API routes
-│   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Home page
-├── components/            # React components
-│   ├── AuthWrapper.tsx    # Authentication wrapper
-│   ├── ChannelBrowser.tsx # Main channel browser
-│   ├── LoginForm.tsx      # IPTV configuration form
-│   └── VideoPlayer.tsx    # Video player
-├── contexts/              # React contexts
-├── hooks/                 # Custom hooks
-├── lib/                   # Utility libraries
-└── types/                 # TypeScript definitions
+â”œâ”€â”€ app/                    # Next.js App Router
+â”‚   â”œâ”€â”€ api/               # API routes
+â”‚   â”œâ”€â”€ layout.tsx         # Root layout
+â”‚   â””â”€â”€ page.tsx           # Home page
+â”œâ”€â”€ components/            # React components
+â”‚   â”œâ”€â”€ AuthWrapper.tsx    # Authentication wrapper
+â”‚   â”œâ”€â”€ ChannelBrowser.tsx # Main channel browser
+â”‚   â”œâ”€â”€ LoginForm.tsx      # IPTV configuration form
+â”‚   â””â”€â”€ VideoPlayer.tsx    # Video player
+â”œâ”€â”€ contexts/              # React contexts
+â”œâ”€â”€ hooks/                 # Custom hooks
+â”œâ”€â”€ lib/                   # Utility libraries
+â””â”€â”€ types/                 # TypeScript definitions
 ```
 
 ## Docker Deployment
@@ -102,6 +102,19 @@ npm run start
 **Note**: This application is designed for personal use with legitimate IPTV services.
 
 ---
+
+
+## Mobile (Flutter)
+
+Native Android + iOS companion lives in `mobile/`. It uses the same Xtream Codes flow as the web app but talks to the panel directly (no Next.js dependency).
+
+```bash
+cd mobile
+flutter pub get
+flutter run
+```
+
+See [mobile/README.md](mobile/README.md) for features, structure, and notes. Web app under `src/` is unchanged.
 
 ## Tags
 
