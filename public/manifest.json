@@ -6,7 +6,7 @@
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#2563eb",
-  "orientation": "landscape-primary",
+  "orientation": "any",
   "scope": "/",
   "lang": "tr",
   "dir": "ltr",

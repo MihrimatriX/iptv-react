@@ -5,10 +5,10 @@ export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   return (
-    <main className="h-screen w-screen overflow-hidden">
+    <div className="h-dvh w-screen overflow-hidden">
       <AuthWrapper>
         <ChannelBrowser />
       </AuthWrapper>
-    </main>
+    </div>
   );
 }

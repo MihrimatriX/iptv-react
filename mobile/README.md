@@ -46,7 +46,7 @@ lib/
 | Data | Store |
 |------|--------|
 | Credentials | `flutter_secure_storage` |
-| Theme mode, last category, search history, wake lock, demo flag, favorites, catalog cache | `shared_preferences` (`SettingsRepository`) |
+| Theme mode, last category, wake lock, demo flag, favorites, catalog cache | `shared_preferences` (`SettingsRepository`) |
 
 ## Notes
 

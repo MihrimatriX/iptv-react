@@ -12,7 +12,6 @@ class SettingsRepository {
 
   static const _kThemeMode = 'iptv_theme_mode';
   static const _kLastCategoryId = 'iptv_last_category_id';
-  static const _kSearchHistory = 'iptv_search_history';
   static const _kWakeLock = 'iptv_player_wake_lock';
   static const _kDemoSession = 'iptv_demo_session';
   static const _kFavorites = 'iptv_favorite_stream_ids';
@@ -52,26 +51,6 @@ class SettingsRepository {
     } else {
       await _prefs.setString(_kLastCategoryId, id);
     }
-  }
-
-  List<String> readSearchHistory({int max = 20}) {
-    final raw = _prefs.getStringList(_kSearchHistory) ?? const [];
-    if (raw.length <= max) return List.unmodifiable(raw);
-    return List.unmodifiable(raw.take(max));
-  }
-
-  Future<void> pushSearchHistory(String query, {int max = 20}) async {
-    final q = query.trim();
-    if (q.isEmpty) return;
-    final next = <String>[q, ...readSearchHistory().where((e) => e != q)];
-    await _prefs.setStringList(
-      _kSearchHistory,
-      next.take(max).toList(),
-    );
-  }
-
-  Future<void> clearSearchHistory() async {
-    await _prefs.remove(_kSearchHistory);
   }
 
   // --- Player ---

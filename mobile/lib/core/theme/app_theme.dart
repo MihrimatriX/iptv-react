@@ -95,8 +95,9 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        systemOverlayStyle:
-            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        systemOverlayStyle: isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
         titleTextStyle: textTheme.titleLarge,
         iconTheme: IconThemeData(color: colors.textPrimary),
       ),
@@ -105,8 +106,10 @@ abstract final class AppTheme {
         fillColor: colors.surface,
         hintStyle: textTheme.bodyLarge?.copyWith(color: colors.textTertiary),
         labelStyle: textTheme.bodySmall?.copyWith(color: colors.textSecondary),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: colors.border),
@@ -162,9 +165,15 @@ abstract final class AppTheme {
         backgroundColor: colors.surface,
         selectedColor: colors.accentMuted,
         side: BorderSide(color: colors.border),
+        showCheckmark: false,
         labelStyle: textTheme.bodySmall!.copyWith(
           color: colors.textSecondary,
           fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        secondaryLabelStyle: textTheme.bodySmall!.copyWith(
+          color: colors.accent,
+          fontWeight: FontWeight.w700,
           fontSize: 13,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),

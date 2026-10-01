@@ -20,8 +20,10 @@ Modern IPTV streaming application built with Next.js and Xtream Codes API integr
 - Real-time search functionality
 - Favorites system for channels and categories
 - Web-based IPTV configuration
+- Demo mode: try the full UI without credentials (public sample HLS streams)
 - Built-in proxy system
 - 5-minute cache for faster loading
+- Keyboard shortcuts: Space play/pause, F fullscreen, M mute
 
 ## Installation
 
@@ -41,7 +43,8 @@ Modern IPTV streaming application built with Next.js and Xtream Codes API integr
 4. **Configure IPTV credentials**
    - IPTV configuration form will appear when app opens
    - Enter your API Base URL, username and password
-   - Credentials are stored securely in your browser
+   - Credentials are stored in your browser only
+   - No credentials? Click **Demo ile dene** on the login screen
 
 ## Commands
 
@@ -61,19 +64,14 @@ Modern IPTV streaming application built with Next.js and Xtream Codes API integr
 
 ```
 src/
-â”œâ”€â”€ app/                    # Next.js App Router
-â”‚   â”œâ”€â”€ api/               # API routes
-â”‚   â”œâ”€â”€ layout.tsx         # Root layout
-â”‚   â””â”€â”€ page.tsx           # Home page
-â”œâ”€â”€ components/            # React components
-â”‚   â”œâ”€â”€ AuthWrapper.tsx    # Authentication wrapper
-â”‚   â”œâ”€â”€ ChannelBrowser.tsx # Main channel browser
-â”‚   â”œâ”€â”€ LoginForm.tsx      # IPTV configuration form
-â”‚   â””â”€â”€ VideoPlayer.tsx    # Video player
-â”œâ”€â”€ contexts/              # React contexts
-â”œâ”€â”€ hooks/                 # Custom hooks
-â”œâ”€â”€ lib/                   # Utility libraries
-â””â”€â”€ types/                 # TypeScript definitions
+  app/                  # Next.js App Router
+    api/xtream/         # POST: fetch categories + channels
+    api/proxy/stream/   # HLS proxy (blocks private/LAN targets)
+  components/           # UI (ChannelBrowser, VideoPlayer, LoginForm, ...)
+  contexts/             # Auth / credentials (incl. demo session)
+  hooks/                # useFavorites (shared store)
+  lib/                  # Xtream client, demo catalog, search
+  types/                # TypeScript definitions
 ```
 
 ## Docker Deployment
@@ -94,7 +92,7 @@ npm run start
 ## Troubleshooting
 
 - **Stream not loading**: Check your IPTV credentials
-- **CORS errors**: Check proxy settings
+- **Stream from a LAN server won't play**: the proxy refuses private/loopback addresses on purpose (SSRF protection)
 - **PWA not installing**: Make sure you're using HTTPS
 
 ---

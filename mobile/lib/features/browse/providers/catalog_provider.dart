@@ -177,14 +177,34 @@ final catalogProvider =
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
+final _letterOrDigit = RegExp(r'[\p{L}\p{N}]', unicode: true);
+const _foldFrom = 'çğıöşüâîû';
+const _foldTo = 'cgiosuaiu';
+
+/// Forgiving search key: lowercase, Turkish accents dropped (ü→u, ı→i),
+/// spaces/punctuation removed so "tv 8" finds "TV8". Mirrors web's
+/// foldForSearch() in src/lib/search.ts.
+String foldForSearch(String text) {
+  final out = StringBuffer();
+  for (final rune in text.toLowerCase().runes) {
+    final char = String.fromCharCode(rune);
+    final i = _foldFrom.indexOf(char);
+    if (i >= 0) {
+      out.write(_foldTo[i]);
+    } else if (_letterOrDigit.hasMatch(char)) {
+      // Also drops the combining dot left by 'İ'.toLowerCase().
+      out.write(char);
+    }
+  }
+  return out.toString();
+}
+
 final filteredStreamsProvider = Provider<List<ChannelStream>>((ref) {
   final catalog = ref.watch(catalogProvider);
-  final query = ref.watch(searchQueryProvider).trim().toLowerCase();
+  final query = foldForSearch(ref.watch(searchQueryProvider));
   final streams = catalog.allStreams;
   if (query.isEmpty) return streams;
-  return streams
-      .where((s) => s.name.toLowerCase().contains(query))
-      .toList();
+  return streams.where((s) => foldForSearch(s.name).contains(query)).toList();
 });
 
 final favoriteStreamsProvider = Provider<List<ChannelStream>>((ref) {

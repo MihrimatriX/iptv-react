@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Tailwind v4 ignores tailwind.config.js unless @config is used; tokens live here. */
+@theme {
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #f8fafc;
+  --color-accent: #38bdf8;
+  --color-accent-foreground: #0f172a;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
+}
+
 :root {
   color-scheme: dark;
 }
@@ -7,40 +17,27 @@
 body {
   background-color: rgb(2 6 23);
   color: rgb(241 245 249);
-  min-height: 100vh;
-  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 0);
-  background-size: 24px 24px;
+  min-height: 100dvh;
+  background-image:
+    radial-gradient(60rem 40rem at 10% -10%, rgba(59, 130, 246, 0.12), transparent 60%),
+    radial-gradient(50rem 30rem at 110% 110%, rgba(56, 189, 248, 0.08), transparent 60%);
+  -webkit-font-smoothing: antialiased;
 }
 
-.scrollbar-thin::-webkit-scrollbar {
-  height: 10px;
-  width: 10px;
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: rgba(30, 41, 59, 0.5);
-  border-radius: 5px;
-  margin: 2px;
+input[type="range"] {
+  accent-color: var(--color-primary);
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.8);
-  border-radius: 5px;
-  border: 1px solid rgba(30, 41, 59, 0.5);
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(148, 163, 184, 1);
-}
-
-.scrollbar-thin::-webkit-scrollbar-corner {
-  background: rgba(30, 41, 59, 0.5);
-}
-
-.card-glass {
-  background-color: rgba(15, 23, 42, 0.6);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 45px -12px rgba(37, 99, 235, 0.35);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

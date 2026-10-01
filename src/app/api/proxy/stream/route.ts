@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { lookup } from "node:dns/promises";
+import { BlockList, isIP } from "node:net";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +29,9 @@ const SKIPPED_PROXY_HEADERS = new Set([
   "content-security-policy",
   "content-length",
   "transfer-encoding",
+  // fetch() already decompressed the body; forwarding this makes the
+  // browser try to gunzip plain text (ERR_CONTENT_DECODING_FAILED).
+  "content-encoding",
   // Never leak upstream redirects to the browser — HLS would then
   // hit the CDN directly (CORS / 509) instead of staying on our proxy.
   "location",
@@ -34,6 +39,61 @@ const SKIPPED_PROXY_HEADERS = new Set([
 ]);
 const PROXY_PATH = "/api/proxy/stream";
 const SESSION_COOKIE = process.env.XTREAM_SESSION_COOKIE ?? null;
+
+// SSRF guard: the proxy takes arbitrary URLs, so never let it reach
+// loopback / LAN / cloud-metadata addresses (also checked on every redirect hop).
+const PRIVATE_NETS = new BlockList();
+for (const [net, prefix] of [
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],
+  ["172.16.0.0", 12],
+  ["192.168.0.0", 16],
+] as const) {
+  PRIVATE_NETS.addSubnet(net, prefix, "ipv4");
+}
+for (const [net, prefix] of [
+  ["::", 127],
+  ["fc00::", 7],
+  ["fe80::", 10],
+] as const) {
+  PRIVATE_NETS.addSubnet(net, prefix, "ipv6");
+}
+
+class BlockedTargetError extends Error {}
+
+// ponytail: DNS is checked once per hop, so a rebinding host could still flip
+// between lookup and connect. Pin the resolved IP in a custom agent if that matters.
+const assertPublicUrl = async (url: URL) => {
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new BlockedTargetError(`Protocol not allowed: ${url.protocol}`);
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  const addresses = isIP(host)
+    ? [{ address: host, family: isIP(host) }]
+    : await lookup(host, { all: true });
+  for (const { address, family } of addresses) {
+    if (PRIVATE_NETS.check(address, family === 6 ? "ipv6" : "ipv4")) {
+      throw new BlockedTargetError(`Private address not allowed: ${host}`);
+    }
+  }
+};
+
+const fetchPublic = async (url: URL, init: RequestInit) => {
+  let current = url;
+  for (let hop = 0; hop < 5; hop += 1) {
+    await assertPublicUrl(current);
+    const response = await fetch(current, { ...init, redirect: "manual" });
+    const location = response.headers.get("location");
+    if (response.status < 300 || response.status >= 400 || !location) {
+      return response;
+    }
+    current = new URL(location, current);
+  }
+  throw new BlockedTargetError("Too many redirects");
+};
 
 const isPlaylistContentType = (contentType?: string | null) =>
   contentType
@@ -167,23 +227,6 @@ const rewritePlaylist = (
     .join(newline);
 };
 
-const applyCors = <T extends Response | NextResponse>(response: T): T => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers":
-      "Content-Type, Range, Accept, Origin, Referer, User-Agent, Cache-Control, Pragma, X-Requested-With",
-    "Access-Control-Expose-Headers":
-      "Accept-Ranges, Content-Length, Content-Range, X-Proxy-Debug, X-Proxy-Environment",
-    "Access-Control-Allow-Credentials": "false",
-    "Access-Control-Max-Age": "86400",
-  };
-  Object.entries(corsHeaders).forEach(([key, value]) =>
-    response.headers.set(key, value)
-  );
-  return response;
-};
-
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const streamUrl = searchParams.get("url");
@@ -198,7 +241,7 @@ export async function GET(request: NextRequest) {
   const requestOrigin = request.nextUrl.origin;
 
   if (!streamUrl) {
-    return applyCors(
+    return (
       NextResponse.json({ error: "Stream URL is required" }, { status: 400 })
     );
   }
@@ -322,7 +365,6 @@ export async function GET(request: NextRequest) {
     const fetchOptions: RequestInit = {
       method: "GET",
       headers: upstreamHeaders,
-      redirect: "follow",
       signal: request.signal,
       cache: "no-store",
     };
@@ -336,7 +378,7 @@ export async function GET(request: NextRequest) {
     }
 
     let retryStage = "initial";
-    let upstreamResponse = await fetch(targetUrl, fetchOptions);
+    let upstreamResponse = await fetchPublic(targetUrl, fetchOptions);
 
     if (debugEnabled) {
       console.log("[Proxy] Upstream response:", {
@@ -365,7 +407,7 @@ export async function GET(request: NextRequest) {
         if (debugEnabled) {
           console.log(`[Proxy] Retrying (${attempt.stage})`);
         }
-        upstreamResponse = await fetch(targetUrl, fetchOptions);
+        upstreamResponse = await fetchPublic(targetUrl, fetchOptions);
       }
     } else if (upstreamResponse.status === 404) {
       // 404 için farklı referer stratejileri dene
@@ -388,7 +430,7 @@ export async function GET(request: NextRequest) {
                 newReferer: refererUrl.toString(),
               });
             }
-            upstreamResponse = await fetch(targetUrl, fetchOptions);
+            upstreamResponse = await fetchPublic(targetUrl, fetchOptions);
           }
         } catch {
           // Geçersiz referer, devam et
@@ -405,7 +447,7 @@ export async function GET(request: NextRequest) {
             newReferer: `${targetUrl.origin}/`,
           });
         }
-        upstreamResponse = await fetch(targetUrl, fetchOptions);
+        upstreamResponse = await fetchPublic(targetUrl, fetchOptions);
       }
 
       // Hala 404 ise, referer'ı tamamen kaldır
@@ -415,7 +457,7 @@ export async function GET(request: NextRequest) {
         if (debugEnabled) {
           console.log("[Proxy] Retrying without Referer after 404");
         }
-        upstreamResponse = await fetch(targetUrl, fetchOptions);
+        upstreamResponse = await fetchPublic(targetUrl, fetchOptions);
       }
     }
 
@@ -454,7 +496,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return applyCors(errorResponse);
+      return errorResponse;
     }
 
     const contentType = upstreamResponse.headers.get("content-type");
@@ -533,7 +575,7 @@ export async function GET(request: NextRequest) {
       }
 
       responseHeaders.delete("content-length");
-      return applyCors(
+      return (
         new NextResponse(rewritten, {
           status: upstreamResponse.status,
           headers: responseHeaders,
@@ -541,7 +583,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return applyCors(
+    return (
       new NextResponse(upstreamResponse.body, {
         status: upstreamResponse.status,
         headers: responseHeaders,
@@ -559,7 +601,7 @@ export async function GET(request: NextRequest) {
           },
         }),
       },
-      { status: 500 }
+      { status: error instanceof BlockedTargetError ? 403 : 500 }
     );
 
     if (shouldLog) {
@@ -570,10 +612,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return applyCors(errorResponse);
+    return errorResponse;
   }
-}
-
-export async function OPTIONS() {
-  return applyCors(new NextResponse(null, { status: 200 }));
 }

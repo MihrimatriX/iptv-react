@@ -11,41 +11,46 @@ interface IPTVCredentials {
   sessionCookie?: string;
   userAgent?: string;
   streamReferer?: string;
+  /** UI showcase mode: local sample catalog, no Xtream server involved. */
+  demo?: boolean;
 }
 
 interface AuthContextType {
   isConfigured: boolean;
+  isDemo: boolean;
   credentials: IPTVCredentials | null;
   configureIPTV: (credentials: IPTVCredentials) => void;
+  enterDemo: () => void;
   clearConfiguration: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const IPTV_STORAGE_KEY = "react-iptv-credentials";
+const DEMO_CREDENTIALS: IPTVCredentials = {
+  apiBase: "demo://local",
+  username: "demo",
+  password: "demo",
+  demo: true,
+};
+
+const normalize = (credentials: IPTVCredentials): IPTVCredentials =>
+  credentials.demo
+    ? DEMO_CREDENTIALS
+    : { ...credentials, apiBase: normalizeXtreamApiBase(credentials.apiBase) };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isConfigured, setIsConfigured] = useState(false);
   const [credentials, setCredentials] = useState<IPTVCredentials | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const storedCredentials = localStorage.getItem(IPTV_STORAGE_KEY);
-      if (storedCredentials) {
-        const parsedCredentials = JSON.parse(storedCredentials);
-        const normalized = {
-          ...parsedCredentials,
-          apiBase: normalizeXtreamApiBase(parsedCredentials.apiBase),
-        };
+      const stored = localStorage.getItem(IPTV_STORAGE_KEY);
+      if (stored) {
+        const parsed: IPTVCredentials = JSON.parse(stored);
+        const normalized = normalize(parsed);
         setCredentials(normalized);
-        setIsConfigured(true);
-        if (normalized.apiBase !== parsedCredentials.apiBase) {
+        if (normalized.apiBase !== parsed.apiBase) {
           localStorage.setItem(IPTV_STORAGE_KEY, JSON.stringify(normalized));
         }
       }
@@ -56,36 +61,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const configureIPTV = (newCredentials: IPTVCredentials) => {
-    const normalized: IPTVCredentials = {
-      ...newCredentials,
-      apiBase: normalizeXtreamApiBase(newCredentials.apiBase),
-    };
+    const normalized = normalize(newCredentials);
     setCredentials(normalized);
-    setIsConfigured(true);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(IPTV_STORAGE_KEY, JSON.stringify(normalized));
-      } catch {}
-    }
+    try {
+      localStorage.setItem(IPTV_STORAGE_KEY, JSON.stringify(normalized));
+    } catch {}
   };
 
   const clearConfiguration = () => {
     setCredentials(null);
-    setIsConfigured(false);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem(IPTV_STORAGE_KEY);
-        localStorage.removeItem("react-iptv-categories-cache");
-      } catch {}
-    }
+    try {
+      localStorage.removeItem(IPTV_STORAGE_KEY);
+      localStorage.removeItem("react-iptv-categories-cache");
+    } catch {}
   };
 
   return (
     <AuthContext.Provider
       value={{
-        isConfigured,
+        isConfigured: credentials !== null,
+        isDemo: credentials?.demo === true,
         credentials,
         configureIPTV,
+        enterDemo: () => configureIPTV(DEMO_CREDENTIALS),
         clearConfiguration,
         isLoading,
       }}

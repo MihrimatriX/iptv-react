@@ -11,6 +11,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/xtream/xtream_models.dart';
+import '../../browse/widgets/channel_tile.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key, required this.args});
@@ -68,7 +69,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       await _player.play();
     } catch (e) {
       if (mounted) {
-        setState(() => _error = 'Oynatma baÅŸlatÄ±lamadÄ±: $e');
+        setState(() => _error = 'Oynatma başlatılamadı: $e');
       }
     }
   }
@@ -115,6 +116,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _armHideTimer();
   }
 
+  Future<void> _showChannels() async {
+    _hideTimer?.cancel();
+    final picked = await showModalBottomSheet<ChannelStream>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (context) =>
+          _ChannelSheet(playlist: _playlist, currentId: _current.id),
+    );
+    if (!mounted) return;
+    if (picked != null && picked.id != _current.id) {
+      setState(() => _current = picked);
+      await _openCurrent();
+    }
+    _armHideTimer();
+  }
+
   Future<void> _toggleFullscreen() async {
     final next = !_isFullscreen;
     setState(() => _isFullscreen = next);
@@ -134,7 +153,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     _armHideTimer();
   }
-
 
   Future<void> _syncWakeLock() async {
     final enabled = ref.read(wakeLockEnabledProvider);
@@ -205,8 +223,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.error_outline,
-                          color: colors.danger, size: 40),
+                      Icon(Icons.error_outline, color: colors.danger, size: 40),
                       const SizedBox(height: 12),
                       Text(
                         _error!,
@@ -228,6 +245,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ignoring: !_showControls,
                   child: _ControlsOverlay(
                     title: _current.name,
+                    position: '${_index + 1} / ${_playlist.length}',
                     isPlaying: _player.state.playing,
                     isFullscreen: _isFullscreen,
                     onBack: () => Navigator.of(context).maybePop(),
@@ -235,6 +253,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     onNext: _next,
                     onPrev: _prev,
                     onFullscreen: _toggleFullscreen,
+                    onChannels: _showChannels,
                   ),
                 ),
               ),
@@ -249,6 +268,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 class _ControlsOverlay extends StatelessWidget {
   const _ControlsOverlay({
     required this.title,
+    required this.position,
     required this.isPlaying,
     required this.isFullscreen,
     required this.onBack,
@@ -256,9 +276,11 @@ class _ControlsOverlay extends StatelessWidget {
     required this.onNext,
     required this.onPrev,
     required this.onFullscreen,
+    required this.onChannels,
   });
 
   final String title;
+  final String position;
   final bool isPlaying;
   final bool isFullscreen;
   final VoidCallback onBack;
@@ -266,6 +288,7 @@ class _ControlsOverlay extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onPrev;
   final VoidCallback onFullscreen;
+  final VoidCallback onChannels;
 
   @override
   Widget build(BuildContext context) {
@@ -275,11 +298,7 @@ class _ControlsOverlay extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color(0xB8000000),
-            Color(0x00000000),
-            Color(0xB8000000),
-          ],
+          colors: [Color(0xB8000000), Color(0x00000000), Color(0xB8000000)],
           stops: [0, 0.45, 1],
         ),
       ),
@@ -291,8 +310,10 @@ class _ControlsOverlay extends StatelessWidget {
               children: [
                 IconButton(
                   onPressed: onBack,
-                  icon: const Icon(Icons.arrow_back_rounded,
-                      color: Colors.white),
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                  ),
                 ),
                 Expanded(
                   child: Text(
@@ -307,21 +328,22 @@ class _ControlsOverlay extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: colors.accent,
-                    shape: BoxShape.circle,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
                   ),
-                ),
-                Text(
-                  'CANLI',
-                  style: TextStyle(
-                    color: colors.accent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
+                  decoration: BoxDecoration(
+                    color: colors.danger,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'CANLI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -355,19 +377,24 @@ class _ControlsOverlay extends StatelessWidget {
               _RoundButton(icon: Icons.skip_next_rounded, onTap: onNext),
             ],
           ),
-          // Accent scrubber rail (live â€” indeterminate scrub feel)
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 12),
+            child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: 1.0,
-                    minHeight: 3,
-                    backgroundColor: const Color(0x33FFFFFF),
-                    color: colors.accent,
+                Text(
+                  position,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontFeatures: [FontFeature.tabularFigures()],
                   ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: onChannels,
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  icon: const Icon(Icons.format_list_bulleted_rounded),
+                  label: const Text('Kanallar'),
                 ),
               ],
             ),
@@ -396,9 +423,7 @@ class _RoundButton extends StatelessWidget {
     final colors = AppColors.of(context);
     final size = large ? 64.0 : 44.0;
     return Material(
-      color: accent
-          ? colors.accent
-          : Colors.white.withValues(alpha: 0.12),
+      color: accent ? colors.accent : Colors.white.withValues(alpha: 0.12),
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -406,12 +431,38 @@ class _RoundButton extends StatelessWidget {
         child: SizedBox(
           width: size,
           height: size,
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: large ? 32 : 24,
-          ),
+          child: Icon(icon, color: Colors.white, size: large ? 32 : 24),
         ),
+      ),
+    );
+  }
+}
+
+class _ChannelSheet extends StatelessWidget {
+  const _ChannelSheet({required this.playlist, required this.currentId});
+
+  final List<ChannelStream> playlist;
+  final int currentId;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      maxChildSize: 0.95,
+      builder: (context, controller) => ListView.separated(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        itemCount: playlist.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, i) {
+          final stream = playlist[i];
+          return ChannelTile(
+            stream: stream,
+            selected: stream.id == currentId,
+            onTap: () => Navigator.pop(context, stream),
+          );
+        },
       ),
     );
   }

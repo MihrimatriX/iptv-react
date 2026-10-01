@@ -12,8 +12,9 @@ import '../../../core/xtream/xtream_models.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../providers/catalog_provider.dart';
-import '../providers/favorites_provider.dart';
 import '../widgets/channel_tile.dart';
+
+typedef OpenPlayer = void Function(ChannelStream, List<ChannelStream>);
 
 class BrowseShell extends ConsumerStatefulWidget {
   const BrowseShell({super.key});
@@ -24,15 +25,6 @@ class BrowseShell extends ConsumerStatefulWidget {
 
 class _BrowseShellState extends ConsumerState<BrowseShell> {
   int _tab = 0;
-  String? _selectedCategoryId;
-  bool _categoryRestored = false;
-  final _searchCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
 
   void _openPlayer(ChannelStream stream, List<ChannelStream> playlist) {
     context.push(
@@ -41,68 +33,42 @@ class _BrowseShellState extends ConsumerState<BrowseShell> {
     );
   }
 
-  void _onSelectCategory(String? id) {
-    setState(() => _selectedCategoryId = id);
-    ref.read(lastCategoryIdProvider.notifier).setCategoryId(id);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final catalog = ref.watch(catalogProvider);
-    final isDemo = ref.watch(authProvider.select((s) => s.isDemo));
     final colors = AppColors.of(context);
-    final savedCategory = ref.watch(lastCategoryIdProvider);
-
-    if (!_categoryRestored) {
-      _categoryRestored = true;
-      _selectedCategoryId = savedCategory;
-    }
 
     return Scaffold(
       backgroundColor: colors.background,
       body: IndexedStack(
         index: _tab,
         children: [
-          _BrowseTab(
-            catalog: catalog,
-            selectedCategoryId: _selectedCategoryId,
-            searchCtrl: _searchCtrl,
-            isDemo: isDemo,
-            onSelectCategory: _onSelectCategory,
-            onOpenPlayer: _openPlayer,
-            onRefresh: () => ref.read(catalogProvider.notifier).refresh(),
-          ),
+          _BrowseTab(onOpenPlayer: _openPlayer),
           _FavoritesTab(onOpenPlayer: _openPlayer),
           const SettingsScreen(embedded: true),
         ],
       ),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          color: colors.bgElevated,
-          border: Border(
-            top: BorderSide(color: colors.border, width: 1),
-          ),
+          border: Border(top: BorderSide(color: colors.border)),
         ),
         child: NavigationBar(
-          backgroundColor: colors.bgElevated,
-          indicatorColor: colors.accentMuted,
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
           destinations: const [
             NavigationDestination(
-              icon: Icon(Icons.grid_view_rounded),
-              selectedIcon: Icon(Icons.grid_view_rounded),
-              label: 'Browse',
+              icon: Icon(Icons.live_tv_outlined),
+              selectedIcon: Icon(Icons.live_tv_rounded),
+              label: 'Kanallar',
             ),
             NavigationDestination(
               icon: Icon(Icons.favorite_border_rounded),
               selectedIcon: Icon(Icons.favorite_rounded),
-              label: 'Favorites',
+              label: 'Favoriler',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),
               selectedIcon: Icon(Icons.settings_rounded),
-              label: 'Settings',
+              label: 'Ayarlar',
             ),
           ],
         ),
@@ -111,29 +77,50 @@ class _BrowseShellState extends ConsumerState<BrowseShell> {
   }
 }
 
-class _BrowseTab extends ConsumerWidget {
-  const _BrowseTab({
-    required this.catalog,
-    required this.selectedCategoryId,
-    required this.searchCtrl,
-    required this.isDemo,
-    required this.onSelectCategory,
-    required this.onOpenPlayer,
-    required this.onRefresh,
-  });
+class _BrowseTab extends ConsumerStatefulWidget {
+  const _BrowseTab({required this.onOpenPlayer});
 
-  final CatalogState catalog;
-  final String? selectedCategoryId;
-  final TextEditingController searchCtrl;
-  final bool isDemo;
-  final ValueChanged<String?> onSelectCategory;
-  final void Function(ChannelStream, List<ChannelStream>) onOpenPlayer;
-  final Future<void> Function() onRefresh;
+  final OpenPlayer onOpenPlayer;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final query = ref.watch(searchQueryProvider);
+  ConsumerState<_BrowseTab> createState() => _BrowseTabState();
+}
+
+class _BrowseTabState extends ConsumerState<_BrowseTab> {
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _setQuery(String value) =>
+      ref.read(searchQueryProvider.notifier).state = value;
+
+  Future<void> _refresh() => ref.read(catalogProvider.notifier).refresh();
+
+  @override
+  Widget build(BuildContext context) {
+    final catalog = ref.watch(catalogProvider);
+    final query = ref.watch(searchQueryProvider).trim();
+    final isDemo = ref.watch(authProvider.select((s) => s.isDemo));
+    final savedCategoryId = ref.watch(lastCategoryIdProvider);
     final colors = AppColors.of(context);
+    final textTheme = Theme.of(context).textTheme;
+
+    // A saved category that no longer exists falls back to "Tümü".
+    ChannelCategory? selected;
+    for (final cat in catalog.categories) {
+      if (cat.id == savedCategoryId) selected = cat;
+    }
+    void selectCategory(String? id) =>
+        ref.read(lastCategoryIdProvider.notifier).setCategoryId(id);
+
+    final channelCount = catalog.categories.fold<int>(
+      0,
+      (sum, c) => sum + c.streams.length,
+    );
 
     return SafeArea(
       bottom: false,
@@ -141,84 +128,100 @@ class _BrowseTab extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(20, 16, 16, 0),
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    'Kanallar',
-                    style: Theme.of(context).textTheme.titleLarge,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Canlı TV', style: textTheme.displayMedium),
+                      if (catalog.categories.isNotEmpty)
+                        Text(
+                          '${catalog.categories.length} kategori · $channelCount kanal',
+                          style: textTheme.bodySmall,
+                        ),
+                    ],
                   ),
                 ),
-                if (isDemo)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: colors.accentMuted,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      'DEMO',
-                      style: TextStyle(
-                        color: colors.accent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
+                if (isDemo) const _Pill(label: 'DEMO'),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: SizedBox(
-              height: 44,
-              child: TextField(
-                controller: searchCtrl,
-                onChanged: (v) {
-                  ref.read(searchQueryProvider.notifier).state = v;
-                },
-                onSubmitted: (v) {
-                  ref.read(prefsStorageProvider).pushSearchHistory(v);
-                },
-                style: const TextStyle(fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Kanal ara…',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                  suffixIcon: query.isEmpty
-                      ? null
-                      : IconButton(
-                          onPressed: () {
-                            searchCtrl.clear();
-                            ref.read(searchQueryProvider.notifier).state = '';
-                          },
-                          icon: const Icon(Icons.clear_rounded, size: 18),
-                        ),
-                ),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: SearchBar(
+              controller: _searchCtrl,
+              hintText: 'Kanal ara',
+              onChanged: _setQuery,
+              leading: const Icon(Icons.search_rounded),
+              trailing: [
+                if (query.isNotEmpty)
+                  IconButton(
+                    tooltip: 'Temizle',
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      _setQuery('');
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+              ],
+              elevation: const WidgetStatePropertyAll(0),
+              backgroundColor: WidgetStatePropertyAll(colors.surface),
+              side: WidgetStatePropertyAll(BorderSide(color: colors.border)),
+              padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 14),
               ),
             ),
           ),
-          Expanded(child: _buildBody(context, ref, query, colors)),
+          if (query.isEmpty && catalog.categories.isNotEmpty)
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                scrollDirection: Axis.horizontal,
+                itemCount: catalog.categories.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return ChoiceChip(
+                      label: const Text('Tümü'),
+                      selected: selected == null,
+                      onSelected: (_) => selectCategory(null),
+                    );
+                  }
+                  final cat = catalog.categories[index - 1];
+                  return ChoiceChip(
+                    label: Text(cat.name),
+                    selected: selected?.id == cat.id,
+                    onSelected: (_) => selectCategory(cat.id),
+                  );
+                },
+              ),
+            ),
+          SizedBox(
+            height: 2,
+            child: catalog.isRefreshing
+                ? const LinearProgressIndicator(minHeight: 2)
+                : null,
+          ),
+          Expanded(child: _buildBody(catalog, query, selected, selectCategory)),
         ],
       ),
     );
   }
 
   Widget _buildBody(
-    BuildContext context,
-    WidgetRef ref,
+    CatalogState catalog,
     String query,
-    AppColors colors,
+    ChannelCategory? selected,
+    ValueChanged<String?> selectCategory,
   ) {
     if (catalog.isLoading && catalog.categories.isEmpty) {
       return const CatalogSkeleton();
     }
     if (catalog.error != null && catalog.categories.isEmpty) {
-      return ErrorState(message: catalog.error!, onRetry: onRefresh);
+      return ErrorState(message: catalog.error!, onRetry: _refresh);
     }
     if (catalog.categories.isEmpty) {
       return EmptyState(
@@ -226,15 +229,12 @@ class _BrowseTab extends ConsumerWidget {
         title: 'Kanal bulunamadı',
         message: 'Sunucudan canlı kategori veya kanal gelmedi.',
         actionLabel: 'Yenile',
-        onAction: onRefresh,
+        onAction: _refresh,
       );
     }
 
-    final q = query.trim().toLowerCase();
-    if (q.isNotEmpty) {
-      final results = catalog.allStreams
-          .where((s) => s.name.toLowerCase().contains(q))
-          .toList();
+    if (query.isNotEmpty) {
+      final results = ref.watch(filteredStreamsProvider);
       if (results.isEmpty) {
         return const EmptyState(
           icon: Icons.search_off_rounded,
@@ -242,181 +242,134 @@ class _BrowseTab extends ConsumerWidget {
           message: 'Aramanla eşleşen kanal bulunamadı.',
         );
       }
-      return ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemCount: results.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (context, i) {
-          final stream = results[i];
-          return ChannelTile(
-            stream: stream,
-            onTap: () => onOpenPlayer(stream, results),
-          );
-        },
-      );
-    }
-
-    ChannelCategory? selected;
-    if (selectedCategoryId != null) {
-      for (final cat in catalog.categories) {
-        if (cat.id == selectedCategoryId) {
-          selected = cat;
-          break;
-        }
-      }
+      return _ChannelList(streams: results, onOpenPlayer: widget.onOpenPlayer);
     }
 
     return RefreshIndicator(
-      color: colors.accent,
-      backgroundColor: colors.surface,
-      onRefresh: onRefresh,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 24),
+      onRefresh: _refresh,
+      child: selected == null
+          ? ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 8, bottom: 24),
+              itemCount: catalog.categories.length,
+              itemBuilder: (context, i) => _CategoryRail(
+                category: catalog.categories[i],
+                onOpenPlayer: widget.onOpenPlayer,
+                onSeeAll: () => selectCategory(catalog.categories[i].id),
+              ),
+            )
+          : _ChannelList(
+              streams: selected.streams,
+              onOpenPlayer: widget.onOpenPlayer,
+            ),
+    );
+  }
+}
+
+class _ChannelList extends StatelessWidget {
+  const _ChannelList({required this.streams, required this.onOpenPlayer});
+
+  final List<ChannelStream> streams;
+  final OpenPlayer onOpenPlayer;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      itemCount: streams.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, i) => ChannelTile(
+        stream: streams[i],
+        onTap: () => onOpenPlayer(streams[i], streams),
+      ),
+    );
+  }
+}
+
+class _CategoryRail extends StatelessWidget {
+  const _CategoryRail({
+    required this.category,
+    required this.onOpenPlayer,
+    required this.onSeeAll,
+  });
+
+  final ChannelCategory category;
+  final OpenPlayer onOpenPlayer;
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final streams = category.streams;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 8, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    category.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                TextButton(
+                  onPressed: onSeeAll,
+                  child: Text(
+                    'Tümü (${streams.length})',
+                    style: TextStyle(color: colors.accent, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
           SizedBox(
-            height: 40,
+            height: ChannelCard.width + 44,
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               scrollDirection: Axis.horizontal,
-              itemCount: catalog.categories.length + 1,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return _Chip(
-                    label: 'Tümü',
-                    active: selectedCategoryId == null,
-                    onTap: () => onSelectCategory(null),
-                  );
-                }
-                final cat = catalog.categories[index - 1];
-                return _Chip(
-                  label: cat.name,
-                  active: selectedCategoryId == cat.id,
-                  onTap: () => onSelectCategory(cat.id),
-                );
-              },
+              itemCount: streams.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, i) => ChannelCard(
+                stream: streams[i],
+                onTap: () => onOpenPlayer(streams[i], streams),
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          if (selectedCategoryId == null)
-            ...catalog.categories.expand((cat) {
-              final preview = cat.streams.take(8).toList();
-              return [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          cat.name,
-                          style: TextStyle(
-                            color: colors.textPrimary,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${cat.streams.length}',
-                        style: TextStyle(
-                          color: colors.textTertiary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ...preview.map(
-                  (stream) => Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: ChannelTile(
-                      stream: stream,
-                      onTap: () => onOpenPlayer(stream, cat.streams),
-                    ),
-                  ),
-                ),
-                if (cat.streams.length > 8)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: TextButton(
-                      onPressed: () => onSelectCategory(cat.id),
-                      child: Text(
-                        'Tümünü gör (${cat.streams.length})',
-                        style: TextStyle(color: colors.accent),
-                      ),
-                    ),
-                  ),
-              ];
-            })
-          else if (selected != null) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: Text(
-                selected.name,
-                style: TextStyle(
-                  color: colors.textPrimary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ...selected.streams.map(
-              (stream) => Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: ChannelTile(
-                  stream: stream,
-                  onTap: () => onOpenPlayer(stream, selected!.streams),
-                ),
-              ),
-            ),
-          ] else
-            const EmptyState(
-              icon: Icons.category_outlined,
-              title: 'Kategori yok',
-              message: 'Seçilen kategori bulunamadı.',
-            ),
         ],
       ),
     );
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
+class _Pill extends StatelessWidget {
+  const _Pill({required this.label});
 
   final String label;
-  final bool active;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? colors.accentMuted : colors.surface,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: active
-                ? colors.accent.withValues(alpha: 0.35)
-                : colors.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? colors.accent : colors.textSecondary,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.accentMuted,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: colors.accent,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
         ),
       ),
     );
@@ -426,7 +379,7 @@ class _Chip extends StatelessWidget {
 class _FavoritesTab extends ConsumerWidget {
   const _FavoritesTab({required this.onOpenPlayer});
 
-  final void Function(ChannelStream, List<ChannelStream>) onOpenPlayer;
+  final OpenPlayer onOpenPlayer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -437,10 +390,10 @@ class _FavoritesTab extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
             child: Text(
               'Favoriler',
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context).textTheme.displayMedium,
             ),
           ),
           Expanded(
@@ -449,20 +402,9 @@ class _FavoritesTab extends ConsumerWidget {
                     icon: Icons.favorite_border_rounded,
                     title: 'Henüz favori yok',
                     message:
-                        'Kanalların yanındaki kalp ikonuyla favorilere ekleyebilirsin.',
+                        'Kanal satırındaki kalbe dokun ya da karta uzun bas.',
                   )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: favorites.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) {
-                      final stream = favorites[i];
-                      return ChannelTile(
-                        stream: stream,
-                        onTap: () => onOpenPlayer(stream, favorites),
-                      );
-                    },
-                  ),
+                : _ChannelList(streams: favorites, onOpenPlayer: onOpenPlayer),
           ),
         ],
       ),

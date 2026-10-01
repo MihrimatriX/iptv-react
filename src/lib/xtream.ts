@@ -20,10 +20,9 @@ export class XtreamApiError extends Error {
   }
 }
 
-const DEFAULT_API_BASE = "http://tgrpro25.xyz:8080/player_api.php";
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0";
-const API_BASE = process.env.XTREAM_API_BASE ?? DEFAULT_API_BASE;
+const API_BASE = process.env.XTREAM_API_BASE;
 const USERNAME = process.env.XTREAM_USERNAME;
 const PASSWORD = process.env.XTREAM_PASSWORD;
 const SESSION_COOKIE = process.env.XTREAM_SESSION_COOKIE;
@@ -65,9 +64,9 @@ const ensureCredentials = (credentials?: IPTVCredentials) => {
     };
   }
 
-  if (!USERNAME || !PASSWORD) {
+  if (!API_BASE || !USERNAME || !PASSWORD) {
     throw new Error(
-      "Xtream servis bilgileri eksik. Lutfen IPTV yapılandırmasını tamamlayın veya XTREAM_USERNAME ve XTREAM_PASSWORD environment degiskenlerini tanimlayin."
+      "Xtream servis bilgileri eksik. Lutfen IPTV yapılandırmasını tamamlayın veya XTREAM_API_BASE, XTREAM_USERNAME ve XTREAM_PASSWORD environment degiskenlerini tanimlayin."
     );
   }
 
@@ -173,54 +172,36 @@ const normaliseStreams = (
     );
 };
 
-const getLiveCategories = (
-  credentials?: IPTVCredentials
-): Promise<XtreamCategory[]> =>
-  xtreamRequest<XtreamCategory[]>(
-    { action: "get_live_categories" },
-    credentials
-  );
-
-const getLiveStreamsByCategory = (
-  categoryId: string,
-  credentials?: IPTVCredentials
-): Promise<XtreamStream[]> =>
-  xtreamRequest<XtreamStream[]>(
-    { action: "get_live_streams", category_id: categoryId },
-    credentials
-  );
-
 export async function getCategoriesWithStreams(
   credentials?: IPTVCredentials
 ): Promise<ChannelCategory[]> {
   ensureCredentials(credentials);
-  const categories = await getLiveCategories(credentials);
-  const categoriesWithStreams: ChannelCategory[] = [];
+  // One get_live_streams call (no category_id) instead of one per category.
+  const [categories, streams] = await Promise.all([
+    xtreamRequest<XtreamCategory[]>({ action: "get_live_categories" }, credentials),
+    xtreamRequest<XtreamStream[]>({ action: "get_live_streams" }, credentials),
+  ]);
 
-  for (let index = 0; index < categories.length; index += 1) {
-    const category = categories[index];
-    try {
-      const streams = await getLiveStreamsByCategory(
-        category.category_id,
-        credentials
-      );
-      const normalisedCategory: ChannelCategory = {
-        id: category.category_id,
-        name: category.category_name,
-        parentId: category.parent_id,
-        order: Number.parseInt(category.category_id, 10) || index,
-        streams: normaliseStreams(streams, credentials),
-      };
-
-      if (normalisedCategory.streams.length > 0) {
-        categoriesWithStreams.push(normalisedCategory);
-      }
-    } catch {}
+  // Bad credentials: panels answer 200 with {user_info:{auth:0}} instead of a list.
+  if (!Array.isArray(categories) || !Array.isArray(streams)) {
+    throw new XtreamApiError("Xtream API kimlik dogrulamasi basarisiz.", 401);
   }
 
-  return categoriesWithStreams.sort((a, b) =>
-    a.name.localeCompare(b.name, "tr", { sensitivity: "base" })
-  );
+  const byCategory = Map.groupBy(streams, (stream) => String(stream.category_id));
+
+  return categories
+    .map((category, index) => ({
+      id: String(category.category_id),
+      name: category.category_name,
+      parentId: String(category.parent_id ?? "0"),
+      order: Number.parseInt(category.category_id, 10) || index,
+      streams: normaliseStreams(
+        byCategory.get(String(category.category_id)) ?? [],
+        credentials
+      ),
+    }))
+    .filter((category) => category.streams.length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, "tr", { sensitivity: "base" }));
 }
 
 export type { ChannelCategory, ChannelStream };

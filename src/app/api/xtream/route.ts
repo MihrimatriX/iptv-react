@@ -1,30 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCategoriesWithStreams, XtreamApiError } from "@/lib/xtream";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+// Per-user data: never let a CDN or the browser share it.
+const NO_STORE = { "Cache-Control": "private, no-store" };
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 200, headers: corsHeaders });
-}
-
-export async function GET(request: NextRequest) {
+// POST so credentials travel in the body, not in URLs (which end up in logs).
+export async function POST(request: NextRequest) {
   try {
-    const credentialsParam = request.nextUrl.searchParams.get("credentials");
-    const credentials = credentialsParam
-      ? JSON.parse(decodeURIComponent(credentialsParam))
-      : undefined;
-
-    const categories = await getCategoriesWithStreams(credentials);
-    return NextResponse.json(
-      { categories },
-      { headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=60" } }
-    );
+    const body = await request.json().catch(() => ({}));
+    const categories = await getCategoriesWithStreams(body?.credentials);
+    return NextResponse.json({ categories }, { headers: NO_STORE });
   } catch (error) {
     if (error instanceof XtreamApiError) {
       const message =
@@ -32,23 +19,17 @@ export async function GET(request: NextRequest) {
           ? "Kimlik dogrulama basarisiz (401). Kullanici adi/sifre veya API URL'sini kontrol edin."
           : "Xtream API verilerine ulasilamadi";
       return NextResponse.json(
-        {
-          message,
-          error: error.message,
-          status: error.status,
-        },
-        { status: error.status }
+        { message, error: error.message, status: error.status },
+        { status: error.status, headers: NO_STORE }
       );
     }
     return NextResponse.json(
       {
         message: "Xtream API verilerine ulasilamadi",
         error:
-          error instanceof Error
-            ? error.message
-            : "Beklenmedik bir hata olustu",
+          error instanceof Error ? error.message : "Beklenmedik bir hata olustu",
       },
-      { status: 500 }
+      { status: 500, headers: NO_STORE }
     );
   }
 }

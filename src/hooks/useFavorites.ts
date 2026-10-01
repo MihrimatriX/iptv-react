@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import type { ChannelCategory, ChannelStream } from "@/types/xtream";
+import { useCallback, useSyncExternalStore } from "react";
+import type { ChannelCategory } from "@/types/xtream";
 
 interface FavoritesData {
   categories: string[];
@@ -9,91 +9,71 @@ interface FavoritesData {
 }
 
 const FAVORITES_KEY = "react-iptv-favorites";
+const EMPTY: FavoritesData = { categories: [], channels: [] };
+
+// One module-level store shared by every component. Separate useState copies
+// used to overwrite each other's localStorage writes.
+let current: FavoritesData | null = null;
+const listeners = new Set<() => void>();
+
+const read = (): FavoritesData => {
+  if (current) return current;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? "null");
+    current = {
+      categories: Array.isArray(parsed?.categories) ? parsed.categories : [],
+      channels: Array.isArray(parsed?.channels) ? parsed.channels : [],
+    };
+  } catch {
+    current = EMPTY;
+  }
+  return current;
+};
+
+const write = (next: FavoritesData) => {
+  current = next;
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+  } catch {}
+  listeners.forEach((notify) => notify());
+};
+
+const subscribe = (notify: () => void) => {
+  listeners.add(notify);
+  return () => listeners.delete(notify);
+};
+
+const toggle = <T,>(list: T[], value: T) =>
+  list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+
+const toggleCategoryFavorite = (categoryId: string) =>
+  write({ ...read(), categories: toggle(read().categories, categoryId) });
+
+const toggleChannelFavorite = (channelId: number) =>
+  write({ ...read(), channels: toggle(read().channels, channelId) });
 
 export function useFavorites() {
-  const [favorites, setFavorites] = useState<FavoritesData>({
-    categories: [],
-    channels: [],
-  });
-  const [isLoaded, setIsLoaded] = useState(false);
+  const favorites = useSyncExternalStore(subscribe, read, () => EMPTY);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      setIsLoaded(true);
-      return;
-    }
-
-    try {
-      const stored = localStorage.getItem(FAVORITES_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setFavorites(parsed);
-      }
-    } catch (error) {
-      console.error("Error loading favorites:", error);
-    } finally {
-      setIsLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isLoaded || typeof window === "undefined") return;
-
-    try {
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
-    } catch (error) {
-      console.error("Error saving favorites:", error);
-    }
-  }, [favorites, isLoaded]);
-
-  const toggleCategoryFavorite = (categoryId: string) => {
-    setFavorites((prev) => ({
-      ...prev,
-      categories: prev.categories.includes(categoryId)
-        ? prev.categories.filter((id) => id !== categoryId)
-        : [...prev.categories, categoryId],
-    }));
-  };
-
-  const toggleChannelFavorite = (channelId: number) => {
-    setFavorites((prev) => ({
-      ...prev,
-      channels: prev.channels.includes(channelId)
-        ? prev.channels.filter((id) => id !== channelId)
-        : [...prev.channels, channelId],
-    }));
-  };
-
-  const isCategoryFavorite = (categoryId: string) => {
-    return favorites.categories.includes(categoryId);
-  };
-
-  const isChannelFavorite = (channelId: number) => {
-    return favorites.channels.includes(channelId);
-  };
-
-  const getFavoriteCategories = (categories: ChannelCategory[]) => {
-    return categories.filter((cat) => favorites.categories.includes(cat.id));
-  };
-
-  const getFavoriteChannels = (channels: ChannelStream[]) => {
-    return channels.filter((channel) =>
-      favorites.channels.includes(channel.id)
-    );
-  };
-
-  const clearFavorites = () => {
-    setFavorites({ categories: [], channels: [] });
-  };
+  const isCategoryFavorite = useCallback(
+    (categoryId: string) => favorites.categories.includes(categoryId),
+    [favorites]
+  );
+  const isChannelFavorite = useCallback(
+    (channelId: number) => favorites.channels.includes(channelId),
+    [favorites]
+  );
+  const getFavoriteCategories = useCallback(
+    (categories: ChannelCategory[]) =>
+      categories.filter((category) => favorites.categories.includes(category.id)),
+    [favorites]
+  );
 
   return {
-    favorites,
     toggleCategoryFavorite,
     toggleChannelFavorite,
     isCategoryFavorite,
     isChannelFavorite,
     getFavoriteCategories,
-    getFavoriteChannels,
-    clearFavorites,
   };
 }

@@ -31,7 +31,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final ok = await ref.read(authProvider.notifier).login(
+    final ok = await ref
+        .read(authProvider.notifier)
+        .login(
           apiBase: _apiBaseCtrl.text,
           username: _usernameCtrl.text,
           password: _passwordCtrl.text,
@@ -40,9 +42,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!ok && mounted) {
       final error = ref.read(authProvider).error;
       if (error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error)));
       }
     }
   }
@@ -68,20 +69,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 24),
+                  // Align: a bare Container would be stretched by the column.
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brandAccent, Color(0xFF38BDF8)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.brandAccent.withValues(
+                              alpha: 0.35,
+                            ),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.live_tv_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   Text(
                     'AFU IPTV Player',
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.8,
-                        ),
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.8,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Xtream Codes ile kişisel canlı TV deneyimi',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: c.textSecondary,
-                        ),
+                    style: Theme.of(context).textTheme.bodyLarge
+                        ?.copyWith(color: c.textSecondary),
                   ),
                   const SizedBox(height: 32),
                   Form(
@@ -111,8 +143,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           autocorrect: false,
                           decoration: const InputDecoration(
                             labelText: 'Kullanıcı adı',
-                            prefixIcon:
-                                Icon(Icons.person_outline_rounded, size: 20),
+                            prefixIcon: Icon(
+                              Icons.person_outline_rounded,
+                              size: 20,
+                            ),
                           ),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) {
@@ -127,8 +161,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           obscureText: _obscure,
                           decoration: InputDecoration(
                             labelText: 'Şifre',
-                            prefixIcon:
-                                const Icon(Icons.lock_outline_rounded, size: 20),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 20,
+                            ),
                             suffixIcon: IconButton(
                               onPressed: () =>
                                   setState(() => _obscure = !_obscure),
@@ -151,9 +187,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         Align(
                           alignment: Alignment.centerLeft,
                           child: TextButton(
-                            onPressed: () => setState(
-                              () => _showAdvanced = !_showAdvanced,
-                            ),
+                            onPressed: () =>
+                                setState(() => _showAdvanced = !_showAdvanced),
                             child: Text(
                               _showAdvanced
                                   ? 'Gelişmiş ayarları gizle'
@@ -170,8 +205,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             controller: _userAgentCtrl,
                             decoration: const InputDecoration(
                               labelText: 'Özel User-Agent (opsiyonel)',
-                              prefixIcon:
-                                  Icon(Icons.smartphone_rounded, size: 20),
+                              prefixIcon: Icon(
+                                Icons.smartphone_rounded,
+                                size: 20,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -193,26 +230,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 : const Text('Bağlan'),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: auth.isBusy ? null : _enterDemo,
-                          child: Text(
-                            'Demo ile dene',
-                            style: TextStyle(
-                              color: c.textSecondary,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 15,
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(child: Divider(color: c.border)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Text(
+                                'veya',
+                                style: TextStyle(
+                                  color: c.textTertiary,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
-                          ),
+                            Expanded(child: Divider(color: c.border)),
+                          ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 20),
+                        OutlinedButton.icon(
+                          onPressed: auth.isBusy ? null : _enterDemo,
+                          icon: Icon(
+                            Icons.auto_awesome_rounded,
+                            color: c.accent,
+                            size: 20,
+                          ),
+                          label: const Text('Demo ile dene'),
+                        ),
+                        const SizedBox(height: 8),
                         Text(
                           'Kimlik bilgisi olmadan arayüzü keşfet',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: c.textTertiary,
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: c.textTertiary, fontSize: 12),
                         ),
                       ],
                     ),

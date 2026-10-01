@@ -19,15 +19,16 @@ class XtreamApiException implements Exception {
 
 class XtreamClient {
   XtreamClient({Dio? dio})
-      : _dio = dio ??
-            Dio(
-              BaseOptions(
-                connectTimeout: const Duration(seconds: 20),
-                receiveTimeout: const Duration(seconds: 45),
-                responseType: ResponseType.plain,
-                validateStatus: (_) => true,
-              ),
-            );
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 20),
+              receiveTimeout: const Duration(seconds: 45),
+              responseType: ResponseType.plain,
+              validateStatus: (_) => true,
+            ),
+          );
 
   final Dio _dio;
 
@@ -54,33 +55,12 @@ class XtreamClient {
       apiBase: normalizeXtreamApiBase(credentials.apiBase),
     );
 
-    final categories = await _getLiveCategories(normalized);
-    final withStreams = <ChannelCategory>[];
-
-    for (var i = 0; i < categories.length; i++) {
-      final category = categories[i];
-      try {
-        final streams =
-            await _getLiveStreamsByCategory(category.categoryId, normalized);
-        final normalised = ChannelCategory(
-          id: category.categoryId,
-          name: category.categoryName,
-          parentId: category.parentId,
-          order: int.tryParse(category.categoryId) ?? i,
-          streams: _normaliseStreams(streams, normalized),
-        );
-        if (normalised.streams.isNotEmpty) {
-          withStreams.add(normalised);
-        }
-      } catch (_) {
-        // Skip categories that fail individually.
-      }
-    }
-
-    withStreams.sort(
-      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-    );
-    return withStreams;
+    // One get_live_streams call (no category_id) instead of one per category.
+    final (categories, streams) = await (
+      _getLiveCategories(normalized),
+      _getAllLiveStreams(normalized),
+    ).wait;
+    return buildCatalog(categories, streams, normalized);
   }
 
   Future<List<XtreamCategoryRaw>> _getLiveCategories(
@@ -88,7 +68,11 @@ class XtreamClient {
   ) async {
     final raw = await _request(credentials, {'action': 'get_live_categories'});
     if (raw is! List) {
-      throw XtreamApiException('Kategori listesi beklenmeyen formatta.');
+      // Bad credentials: panels answer 200 with {user_info: {auth: 0}}.
+      throw XtreamApiException(
+        'Kimlik doğrulama başarısız. Sunucu adresi, kullanıcı adı ve şifreyi kontrol edin.',
+        status: 401,
+      );
     }
     return raw
         .whereType<Map>()
@@ -96,55 +80,15 @@ class XtreamClient {
         .toList();
   }
 
-  Future<List<XtreamStreamRaw>> _getLiveStreamsByCategory(
-    String categoryId,
+  Future<List<XtreamStreamRaw>> _getAllLiveStreams(
     IptvCredentials credentials,
   ) async {
-    final raw = await _request(credentials, {
-      'action': 'get_live_streams',
-      'category_id': categoryId,
-    });
-    if (raw is! List) {
-      return const [];
-    }
+    final raw = await _request(credentials, {'action': 'get_live_streams'});
+    if (raw is! List) return const [];
     return raw
         .whereType<Map>()
         .map((e) => XtreamStreamRaw.fromJson(Map<String, dynamic>.from(e)))
         .toList();
-  }
-
-  List<ChannelStream> _normaliseStreams(
-    List<XtreamStreamRaw> streams,
-    IptvCredentials credentials,
-  ) {
-    final base = Uri.parse(credentials.apiBase);
-    final origin =
-        '${base.scheme}://${base.host}${base.hasPort ? ':${base.port}' : ''}';
-
-    final mapped = streams.map((stream) {
-      final streamType = stream.streamType.toLowerCase();
-      final extension = streamType == 'live' ? 'm3u8' : 'mp4';
-      final folder = streamType == 'live' ? 'live' : 'movie';
-      final streamUrl =
-          '$origin/$folder/${credentials.username}/${credentials.password}/${stream.streamId}.$extension';
-
-      return ChannelStream(
-        id: stream.streamId,
-        name: stream.name,
-        streamType: streamType,
-        streamIcon: (stream.streamIcon == null || stream.streamIcon!.isEmpty)
-            ? null
-            : stream.streamIcon,
-        added: stream.added,
-        streamUrl: streamUrl,
-        categoryId: stream.categoryId,
-      );
-    }).toList();
-
-    mapped.sort(
-      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-    );
-    return mapped;
   }
 
   Future<dynamic> _request(
@@ -165,8 +109,7 @@ class XtreamClient {
         uri,
         options: Options(
           headers: {
-            'Accept':
-                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'tr,en-US;q=0.9,en;q=0.8',
             'User-Agent': (credentials.userAgent?.trim().isNotEmpty ?? false)
                 ? credentials.userAgent!.trim()
@@ -211,4 +154,58 @@ class XtreamClient {
       );
     }
   }
+}
+
+/// Groups raw streams under their categories, drops empty categories and
+/// builds playable HLS URLs. Pure, so it is unit-tested directly.
+List<ChannelCategory> buildCatalog(
+  List<XtreamCategoryRaw> categories,
+  List<XtreamStreamRaw> streams,
+  IptvCredentials credentials,
+) {
+  final base = Uri.parse(credentials.apiBase);
+  final origin =
+      '${base.scheme}://${base.host}${base.hasPort ? ':${base.port}' : ''}';
+  int byName(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
+
+  final byCategory = <String, List<ChannelStream>>{};
+  for (final stream in streams) {
+    final streamType = stream.streamType.toLowerCase();
+    final isLive = streamType == 'live';
+    byCategory
+        .putIfAbsent(stream.categoryId, () => [])
+        .add(
+          ChannelStream(
+            id: stream.streamId,
+            name: stream.name,
+            streamType: streamType,
+            streamIcon: (stream.streamIcon?.isEmpty ?? true)
+                ? null
+                : stream.streamIcon,
+            added: stream.added,
+            streamUrl:
+                '$origin/${isLive ? 'live' : 'movie'}/${credentials.username}/${credentials.password}/${stream.streamId}.${isLive ? 'm3u8' : 'mp4'}',
+            categoryId: stream.categoryId,
+          ),
+        );
+  }
+
+  final result = <ChannelCategory>[];
+  for (var i = 0; i < categories.length; i++) {
+    final category = categories[i];
+    final channels = byCategory[category.categoryId];
+    if (channels == null || channels.isEmpty) continue;
+    channels.sort((a, b) => byName(a.name, b.name));
+    result.add(
+      ChannelCategory(
+        id: category.categoryId,
+        name: category.categoryName,
+        parentId: category.parentId,
+        order: int.tryParse(category.categoryId) ?? i,
+        streams: channels,
+      ),
+    );
+  }
+  result.sort((a, b) => byName(a.name, b.name));
+  return result;
 }

@@ -8,8 +8,9 @@ abstract final class DemoSampleStreams {
       'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8';
   static const muxBigBuckBunny =
       'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
-  static const akamaiSintel =
-      'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8';
+  // Real 24/7 live test stream (the old Sintel sample now returns 403).
+  static const unifiedLive =
+      'https://demo.unified-streaming.com/k8s/live/stable/live.isml/.m3u8';
   static const tearsOfSteel =
       'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8';
 
@@ -17,7 +18,7 @@ abstract final class DemoSampleStreams {
     appleBipbop,
     appleBipbopClassic,
     muxBigBuckBunny,
-    akamaiSintel,
+    unifiedLive,
     tearsOfSteel,
   ];
 }
@@ -39,7 +40,7 @@ List<ChannelCategory> buildDemoCatalog() {
       name: name,
       streamType: 'live',
       streamUrl: urlFor(seed),
-      streamIcon: 'https://picsum.photos/seed/iptv$seed/96/96',
+      // No logo: ChannelAvatar draws a monogram instead of a random photo.
       categoryId: categoryId,
     );
   }

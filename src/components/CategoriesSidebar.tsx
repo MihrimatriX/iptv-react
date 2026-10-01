@@ -1,6 +1,6 @@
 "use client";
 
-import { Tv, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, LogOut, RefreshCw, Tv } from "lucide-react";
 import { clsx } from "clsx";
 import { CascaderMenu } from "./CascaderMenu";
 import type { ChannelCategory } from "@/types/xtream";
@@ -9,83 +9,94 @@ interface CategoriesSidebarProps {
   categories: ChannelCategory[];
   selectedCategoryId: string;
   onCategorySelect: (categoryId: string) => void;
-  isSidebarOpen: boolean;
-  isMenuCollapsed: boolean;
-  onToggleMenuCollapsed: () => void;
+  isOpen: boolean;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
   totals: { totalStreams: number; totalCategories: number };
+  isDemo: boolean;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  onLogout: () => void;
 }
+
+const iconButton =
+  "rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white disabled:opacity-50";
 
 export const CategoriesSidebar = ({
   categories,
   selectedCategoryId,
   onCategorySelect,
-  isSidebarOpen,
-  isMenuCollapsed,
-  onToggleMenuCollapsed,
+  isOpen,
+  isCollapsed,
+  onToggleCollapsed,
   totals,
+  isDemo,
+  isRefreshing,
+  onRefresh,
+  onLogout,
 }: CategoriesSidebarProps) => {
+  const actions = (
+    <>
+      {!isDemo && (
+        <button onClick={onRefresh} disabled={isRefreshing} className={iconButton} title="Listeyi yenile">
+          <RefreshCw className={clsx("h-4 w-4", isRefreshing && "animate-spin")} />
+        </button>
+      )}
+      <button
+        onClick={onLogout}
+        className={clsx(iconButton, "hover:text-red-300")}
+        title={isDemo ? "Demodan çık" : "Çıkış yap / ayarları değiştir"}
+      >
+        <LogOut className="h-4 w-4" />
+      </button>
+    </>
+  );
+
   return (
     <aside
       className={clsx(
-        "fixed lg:static inset-y-0 left-0 z-50 bg-slate-900/95 backdrop-blur-md border-r border-white/10 transition-transform duration-300 ease-in-out shadow-2xl shadow-black/40 lg:shadow-none",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-        isMenuCollapsed ? "w-12" : "w-[85vw] max-w-sm sm:w-80 lg:w-72"
+        "fixed inset-y-0 left-0 z-50 flex w-[85vw] max-w-xs flex-col border-r border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-xl transition-transform duration-300 ease-out",
+        "lg:static lg:z-auto lg:translate-x-0 lg:bg-slate-950/60 lg:shadow-none",
+        isOpen ? "translate-x-0" : "-translate-x-full",
+        isCollapsed ? "lg:w-14" : "lg:w-72"
       )}
     >
-      <div className="flex h-full flex-col">
-        {/* Collapse Toggle */}
-        <div className="flex items-center justify-between p-2 sm:p-3 border-b border-white/10">
-          {!isMenuCollapsed && (
-            <div className="flex gap-1 text-xs text-slate-300">
-              <div className="flex items-center gap-1 rounded-full bg-white/5 px-1.5 sm:px-2 py-0.5 sm:py-1">
-                <Tv className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-primary" />
-                <span className="font-medium text-white text-xs">
-                  {totals.totalStreams}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 rounded-full bg-white/5 px-1.5 sm:px-2 py-0.5 sm:py-1">
-                <span className="h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-emerald-400" />
-                <span className="font-medium text-white text-xs">
-                  {totals.totalCategories}
-                </span>
-              </div>
-            </div>
-          )}
-          <button
-            onClick={onToggleMenuCollapsed}
-            className="rounded-md p-1 sm:p-1.5 text-slate-400 hover:text-white transition-colors"
-            title={isMenuCollapsed ? "Menüyü genişlet" : "Menüyü daralt"}
-          >
-            {isMenuCollapsed ? (
-              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-            ) : (
-              <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-            )}
-          </button>
+      <div className="flex items-center gap-2 border-b border-white/10 p-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
+          <Tv className="h-4 w-4 text-white" />
         </div>
-
-        {/* Menu Content */}
-        {!isMenuCollapsed && (
-          <div className="flex-1 min-h-0 p-2 sm:p-3">
-            <CascaderMenu
-              categories={categories}
-              selectedCategoryId={selectedCategoryId}
-              onCategorySelect={onCategorySelect}
-            />
-          </div>
-        )}
-
-        {/* Collapsed Menu Icons */}
-        {isMenuCollapsed && (
-          <div className="flex-1 flex flex-col items-center py-4 space-y-2">
-            <div className="rounded-md p-2 bg-white/5 text-slate-400">
-              <Tv className="h-4 w-4" />
+        <div className={clsx("min-w-0 flex-1", isCollapsed && "lg:hidden")}>
+            <div className="flex items-center gap-2">
+              <p className="truncate font-display text-sm font-semibold text-white">IPTV Client</p>
+              {isDemo && (
+                <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent">
+                  DEMO
+                </span>
+              )}
             </div>
-            <div className="rounded-md p-2 bg-white/5 text-slate-400">
-              <Tv className="h-4 w-4" />
-            </div>
-          </div>
-        )}
+            <p className="text-xs text-slate-500">
+              {totals.totalCategories} kategori · {totals.totalStreams} kanal
+            </p>
+        </div>
+        <div className={clsx("flex", isCollapsed && "lg:hidden")}>{actions}</div>
+        <button
+          onClick={onToggleCollapsed}
+          className={clsx(iconButton, "hidden lg:block")}
+          title={isCollapsed ? "Menüyü genişlet" : "Menüyü daralt"}
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {isCollapsed && (
+        <div className="hidden flex-col items-center gap-1 py-3 lg:flex">{actions}</div>
+      )}
+      <div className={clsx("min-h-0 flex-1 p-3", isCollapsed && "lg:hidden")}>
+        <CascaderMenu
+          categories={categories}
+          selectedCategoryId={selectedCategoryId}
+          onCategorySelect={onCategorySelect}
+        />
       </div>
     </aside>
   );

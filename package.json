@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "test": "node --test src/lib/search.test.mjs",
     "generate-icons": "node scripts/generate-icons.js",
     "pwa-build": "npm run generate-icons && npm run build"
   },

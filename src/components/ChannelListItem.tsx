@@ -1,130 +1,110 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { memo, useState } from "react";
 import Image from "next/image";
 import { clsx } from "clsx";
-import { Play, ExternalLink, Heart, HeartOff } from "lucide-react";
+import { ExternalLink, Star } from "lucide-react";
 import type { ChannelStream } from "@/types/xtream";
 
 interface ChannelListItemProps {
   stream: ChannelStream;
   onPlay: (stream: ChannelStream) => void;
   isFavorite: boolean;
-  onToggleFavorite: () => void;
+  onToggleFavorite: (streamId: number) => void;
   isActive: boolean;
 }
 
-export const ChannelListItem = ({
+// Same name→hue hash as mobile's ChannelAvatar, so both apps color channels alike.
+const monogramGradient = (name: string) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) & 0x7fffffff;
+  const hue = hash % 360;
+  return `linear-gradient(135deg, hsl(${hue} 60% 45%), hsl(${(hue + 40) % 360} 65% 30%))`;
+};
+
+export const ChannelListItem = memo(function ChannelListItem({
   stream,
   onPlay,
   isFavorite,
   onToggleFavorite,
   isActive,
-}: ChannelListItemProps) => {
+}: ChannelListItemProps) {
   const [imageError, setImageError] = useState(false);
-  const handlePlayClick = useCallback(() => onPlay(stream), [onPlay, stream]);
-
-  const handleExternalClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      window.open(stream.streamUrl, "_blank", "noopener,noreferrer");
-    },
-    [stream.streamUrl]
-  );
-
-  const containerClasses = clsx(
-    "group flex items-center gap-2 rounded-md p-2 transition-all hover:border-primary/50 hover:bg-white/10",
-    isActive
-      ? "border-primary bg-primary/20 shadow-lg shadow-primary/20"
-      : "border-white/10 bg-white/5"
-  );
-
-  const titleClasses = clsx(
-    "truncate text-xs font-semibold transition-colors",
-    isActive ? "text-white" : "text-white group-hover:text-primary"
-  );
-
-  const subtitleClasses = clsx(
-    "text-xs",
-    isActive ? "text-white/80" : "text-slate-400"
-  );
-  const initialClasses = clsx(
-    "text-xs font-semibold uppercase",
-    isActive ? "text-white/80" : "text-white/60"
-  );
 
   return (
-    <div className={containerClasses}>
-      {/* Channel Logo */}
-      <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-gradient-to-tr from-slate-800 to-slate-700">
-        {stream.streamIcon && !imageError ? (
-          <Image
-            src={stream.streamIcon}
-            alt={stream.name}
-            fill
-            sizes="32px"
-            className="object-contain object-center p-0.5"
-            unoptimized
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <span className={initialClasses}>{stream.name.charAt(0)}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Channel Info */}
-      <div className="flex-1 min-w-0">
-        <h3 className={titleClasses}>{stream.name}</h3>
-        <p className={subtitleClasses}>
-          {stream.streamType === "live" ? "Canlı" : stream.streamType}
-        </p>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite();
-          }}
-          className={clsx(
-            "group/btn inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition",
-            isFavorite
-              ? "text-red-400 hover:text-red-300"
-              : "text-slate-500 hover:text-slate-300"
-          )}
-          title={isFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
-        >
-          {isFavorite ? (
-            <Heart className="h-3 w-3" />
+    <div
+      className={clsx(
+        // content-visibility: browser skips rendering off-screen rows in huge lists.
+        "group flex items-center rounded-xl transition [contain-intrinsic-size:auto_56px] [content-visibility:auto]",
+        isActive ? "bg-primary/15 ring-1 ring-primary/50" : "hover:bg-white/5"
+      )}
+    >
+      <button
+        onClick={() => onPlay(stream)}
+        className="flex min-w-0 flex-1 items-center gap-3 p-2 text-left"
+        aria-current={isActive || undefined}
+      >
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-slate-800 to-slate-700 ring-1 ring-white/10">
+          {stream.streamIcon && !imageError ? (
+            <Image
+              src={stream.streamIcon}
+              alt=""
+              fill
+              sizes="40px"
+              className="object-contain p-1"
+              unoptimized
+              onError={() => setImageError(true)}
+            />
           ) : (
-            <HeartOff className="h-3 w-3" />
+            <span
+              className="flex h-full w-full items-center justify-center text-sm font-semibold uppercase text-white"
+              style={{ background: monogramGradient(stream.name) }}
+            >
+              {stream.name.charAt(0)}
+            </span>
           )}
-        </button>
-        <button
-          type="button"
-          onClick={handlePlayClick}
-          className={clsx(
-            "group/btn inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-white transition hover:bg-primary/80",
-            isActive &&
-              "ring-2 ring-primary/60 ring-offset-1 ring-offset-slate-900"
-          )}
-          title="Kanalı oynat"
-        >
-          <Play className="h-3 w-3 transition-transform group-hover/btn:scale-110" />
-        </button>
-        <button
-          type="button"
-          onClick={handleExternalClick}
-          className="group/btn inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/5 px-1.5 py-1 text-xs font-medium text-white transition hover:bg-white/10"
-          title="Yeni sekmede aç"
-        >
-          <ExternalLink className="h-3 w-3 transition-transform group-hover/btn:scale-110" />
-        </button>
-      </div>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={clsx("truncate text-sm font-medium", isActive ? "text-white" : "text-slate-200")}>
+            {stream.name}
+          </p>
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            {isActive ? (
+              <>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                Oynatılıyor
+              </>
+            ) : stream.streamType === "live" ? (
+              "Canlı"
+            ) : (
+              stream.streamType
+            )}
+          </p>
+        </div>
+      </button>
+
+      <button
+        onClick={() => onToggleFavorite(stream.id)}
+        aria-pressed={isFavorite}
+        className={clsx(
+          "rounded-lg p-2 transition",
+          isFavorite
+            ? "text-amber-300"
+            : "text-slate-600 hover:text-slate-300 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+        )}
+        title={isFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+      >
+        <Star className={clsx("h-4 w-4", isFavorite && "fill-current")} />
+      </button>
+      <a
+        href={stream.streamUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mr-1 hidden rounded-lg p-2 text-slate-500 opacity-0 transition hover:text-white focus-visible:opacity-100 group-hover:opacity-100 lg:block"
+        title="Harici oynatıcıda aç (VLC vb.)"
+      >
+        <ExternalLink className="h-4 w-4" />
+      </a>
     </div>
   );
-};
+});

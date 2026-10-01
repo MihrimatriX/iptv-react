@@ -1,284 +1,224 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import {
+  AlertCircle,
+  ChevronDown,
   Eye,
   EyeOff,
-  Lock,
-  User,
-  AlertCircle,
-  Server,
   Globe,
-  Settings,
+  Lock,
+  Play,
+  Server,
+  Sparkles,
+  Tv,
+  User,
 } from "lucide-react";
-import { useAuth, type IPTVCredentials } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+
+const inputClass =
+  "w-full min-w-0 rounded-xl border border-white/10 bg-slate-950/60 py-3 pl-10 pr-4 text-base text-white placeholder-slate-500 transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30";
+
+function Field({
+  id,
+  label,
+  hint,
+  icon,
+  children,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-300">
+        {label}
+      </label>
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+          {icon}
+        </span>
+        {children}
+      </div>
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    </div>
+  );
+}
 
 export function LoginForm() {
-  const [apiBase, setApiBase] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [sessionCookie, setSessionCookie] = useState("");
-  const [userAgent, setUserAgent] = useState("");
-  const [streamReferer, setStreamReferer] = useState("");
+  const { configureIPTV, enterDemo } = useAuth();
+  const [form, setForm] = useState({
+    apiBase: "",
+    username: "",
+    password: "",
+    sessionCookie: "",
+    userAgent: "",
+    streamReferer: "",
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
 
-  const { configureIPTV } = useAuth();
+  const bind = (key: keyof typeof form) => ({
+    id: key,
+    value: form[key],
+    onChange: (e: { target: { value: string } }) =>
+      setForm((prev) => ({ ...prev, [key]: e.target.value })),
+  });
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    setIsLoading(true);
-
     try {
-      if (!apiBase.trim() || !username.trim() || !password.trim()) {
-        setError("API Base URL, kullanıcı adı ve şifre gereklidir");
-        return;
-      }
-
-      try {
-        new URL(apiBase);
-      } catch {
-        setError("Geçerli bir API Base URL giriniz");
-        return;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const credentials: IPTVCredentials = {
-        apiBase: apiBase.trim(),
-        username: username.trim(),
-        password: password.trim(),
-        sessionCookie: sessionCookie.trim() || undefined,
-        userAgent: userAgent.trim() || undefined,
-        streamReferer: streamReferer.trim() || undefined,
-      };
-
-      configureIPTV(credentials);
-    } catch (err) {
-      setError("Konfigürasyon kaydedilirken bir hata oluştu");
-    } finally {
-      setIsLoading(false);
+      new URL(form.apiBase.trim());
+    } catch {
+      setError("Geçerli bir API Base URL giriniz (ör. http://sunucu.com:8080)");
+      return;
     }
+    configureIPTV({
+      apiBase: form.apiBase.trim(),
+      username: form.username.trim(),
+      password: form.password.trim(),
+      sessionCookie: form.sessionCookie.trim() || undefined,
+      userAgent: form.userAgent.trim() || undefined,
+      streamReferer: form.streamReferer.trim() || undefined,
+    });
   };
 
-  const inputClass =
-    "w-full min-w-0 pl-10 pr-4 py-2.5 sm:py-3 text-base bg-slate-900/50 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors disabled:opacity-60";
+  const canSubmit = form.apiBase && form.username && form.password;
 
   return (
-    <div className="h-full overflow-y-auto overflow-x-hidden overscroll-contain bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex">
-      <div className="m-auto w-full max-w-2xl min-w-0 px-3 py-4 sm:px-4 sm:py-8">
-        {/* Logo/Header */}
-        <div className="text-center mb-4 sm:mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-primary/20 rounded-full mb-3 sm:mb-4">
-            <Settings className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+    <div className="flex h-dvh overflow-y-auto overscroll-contain">
+      <div className="m-auto w-full max-w-md px-4 py-10">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/30">
+            <Tv className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-white">
             React IPTV Client
           </h1>
-          <p className="text-sm sm:text-base text-slate-400">
-            IPTV servis bilgilerinizi yapılandırın
+          <p className="mt-1 text-sm text-slate-400">
+            Xtream Codes hesabınızla bağlanın
           </p>
         </div>
 
-        {/* Configuration Form */}
-        <div className="bg-slate-800/50 backdrop-blur-md rounded-xl border border-white/10 p-4 sm:p-6 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-            {/* API Base URL Field */}
-            <div className="min-w-0">
-              <label
-                htmlFor="apiBase"
-                className="block text-sm font-medium text-slate-300 mb-1.5 sm:mb-2"
-              >
-                API Base URL *
-              </label>
-              <div className="relative">
-                <Server className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+        <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Field
+              id="apiBase"
+              label="Sunucu adresi"
+              hint="/player_api.php yoksa otomatik eklenir"
+              icon={<Server className="h-4 w-4" />}
+            >
+              <input
+                {...bind("apiBase")}
+                type="url"
+                inputMode="url"
+                autoComplete="url"
+                className={inputClass}
+                placeholder="http://sunucu.com:8080"
+                required
+              />
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="username" label="Kullanıcı adı" icon={<User className="h-4 w-4" />}>
                 <input
-                  id="apiBase"
-                  type="url"
-                  value={apiBase}
-                  onChange={(e) => setApiBase(e.target.value)}
+                  {...bind("username")}
+                  autoComplete="username"
+                  autoCapitalize="none"
                   className={inputClass}
-                  placeholder="http://server.com:8080"
                   required
-                  disabled={isLoading}
                 />
-              </div>
-              <p className="text-xs text-slate-500 mt-1 break-words">
-                Sunucu adresi yeterli; /player_api.php yoksa otomatik eklenir
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-              {/* Username Field */}
-              <div className="min-w-0 flex-1">
-                <label
-                  htmlFor="username"
-                  className="block text-sm font-medium text-slate-300 mb-1.5 sm:mb-2"
-                >
-                  Kullanıcı Adı *
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
-                  <input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className={inputClass}
-                    placeholder="IPTV kullanıcı adınız"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              {/* Password Field */}
-              <div className="min-w-0 flex-1">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-slate-300 mb-1.5 sm:mb-2"
-                >
-                  Şifre *
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={`${inputClass} pr-12`}
-                    placeholder="IPTV şifreniz"
-                    required
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-300 transition-colors"
-                    disabled={isLoading}
-                    aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Session Cookie Field */}
-            <div className="min-w-0">
-              <label
-                htmlFor="sessionCookie"
-                className="block text-sm font-medium text-slate-300 mb-1.5 sm:mb-2"
-              >
-                Session Cookie (Opsiyonel)
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+              </Field>
+              <Field id="password" label="Şifre" icon={<Lock className="h-4 w-4" />}>
                 <input
+                  {...bind("password")}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  className={`${inputClass} pr-11`}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 transition hover:text-slate-200"
+                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </Field>
+            </div>
+
+            <details className="group rounded-xl border border-white/5 bg-white/[0.02]">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm text-slate-400 transition hover:text-slate-200">
+                Gelişmiş ayarlar
+                <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+              </summary>
+              <div className="space-y-4 px-3 pb-3">
+                <Field
                   id="sessionCookie"
-                  type="text"
-                  value={sessionCookie}
-                  onChange={(e) => setSessionCookie(e.target.value)}
-                  className={inputClass}
-                  placeholder="capp_name_session=..."
-                  disabled={isLoading}
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-1 break-words">
-                Erişim kısıtlaması varsa tarayıcıdan alınan session cookie
-              </p>
-            </div>
-
-            {/* User Agent Field */}
-            <div className="min-w-0">
-              <label
-                htmlFor="userAgent"
-                className="block text-sm font-medium text-slate-300 mb-1.5 sm:mb-2"
-              >
-                User Agent (Opsiyonel)
-              </label>
-              <div className="relative">
-                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
-                <input
-                  id="userAgent"
-                  type="text"
-                  value={userAgent}
-                  onChange={(e) => setUserAgent(e.target.value)}
-                  className={inputClass}
-                  placeholder="Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
-                  disabled={isLoading}
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-1 break-words">
-                Özel User-Agent string (boş bırakılırsa varsayılan kullanılır)
-              </p>
-            </div>
-
-            {/* Stream Referer Field */}
-            <div className="min-w-0">
-              <label
-                htmlFor="streamReferer"
-                className="block text-sm font-medium text-slate-300 mb-1.5 sm:mb-2"
-              >
-                Stream Referer (Opsiyonel)
-              </label>
-              <div className="relative">
-                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
-                <input
+                  label="Session cookie"
+                  hint="Panel erişim kısıtlıyorsa tarayıcıdan alınan cookie"
+                  icon={<Lock className="h-4 w-4" />}
+                >
+                  <input {...bind("sessionCookie")} className={inputClass} placeholder="name_session=..." />
+                </Field>
+                <Field id="userAgent" label="User-Agent" icon={<Globe className="h-4 w-4" />}>
+                  <input {...bind("userAgent")} className={inputClass} placeholder="Varsayılan kullanılır" />
+                </Field>
+                <Field
                   id="streamReferer"
-                  type="url"
-                  value={streamReferer}
-                  onChange={(e) => setStreamReferer(e.target.value)}
-                  className={inputClass}
-                  placeholder="http://server.com/"
-                  disabled={isLoading}
-                />
+                  label="Yayın referer"
+                  hint="Boşsa yayın sunucusunun adresi kullanılır"
+                  icon={<Globe className="h-4 w-4" />}
+                >
+                  <input {...bind("streamReferer")} type="url" className={inputClass} placeholder="http://sunucu.com/" />
+                </Field>
               </div>
-              <p className="text-xs text-slate-500 mt-1 break-words">
-                Stream istekleri için referer URL&apos;i
-              </p>
-            </div>
+            </details>
 
-            {/* Error Message */}
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading || !apiBase || !username || !password}
-              className="w-full min-h-11 py-2.5 sm:py-3 bg-primary hover:bg-primary/80 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              disabled={!canSubmit}
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-semibold text-white shadow-lg shadow-primary/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:shadow-none"
             >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Yapılandırılıyor...
-                </>
-              ) : (
-                "IPTV'yi Yapılandır"
-              )}
+              <Play className="h-4 w-4" />
+              Bağlan
             </button>
           </form>
 
-          {/* Footer */}
-          <div className="mt-4 sm:mt-6 text-center">
-            <p className="text-xs text-slate-500">
-              Bilgileriniz güvenli bir şekilde tarayıcınızda saklanır
-            </p>
+          <div className="my-5 flex items-center gap-3 text-xs text-slate-500">
+            <span className="h-px flex-1 bg-white/10" />
+            veya
+            <span className="h-px flex-1 bg-white/10" />
           </div>
+
+          <button
+            type="button"
+            onClick={enterDemo}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 font-medium text-slate-200 transition hover:border-primary/50 hover:bg-primary/10"
+          >
+            <Sparkles className="h-4 w-4 text-accent" />
+            Demo ile dene
+          </button>
+          <p className="mt-2 text-center text-xs text-slate-500">
+            Giriş bilgisi olmadan örnek kanallar ve açık test yayınlarıyla arayüzü keşfedin
+          </p>
         </div>
+
+        <p className="mt-6 text-center text-xs text-slate-500">
+          Bilgileriniz yalnızca bu tarayıcıda saklanır. Yalnızca yasal aboneliklerle kullanın.
+        </p>
       </div>
     </div>
   );

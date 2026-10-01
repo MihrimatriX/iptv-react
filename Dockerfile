@@ -34,6 +34,7 @@ RUN npm ci --omit=dev
 # Uygulama dosyalarını ekle
 COPY --from=build /app/next.config.mjs ./next.config.mjs
 COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
 
 EXPOSE 3000
 USER node

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { clsx } from "clsx";
-import { Heart, HeartOff, Star, StarOff } from "lucide-react";
+import { Star } from "lucide-react";
 import type { ChannelCategory } from "@/types/xtream";
 import { useFavorites } from "@/hooks/useFavorites";
 
@@ -21,73 +21,42 @@ export function CascaderMenu({
   const { isCategoryFavorite, toggleCategoryFavorite, getFavoriteCategories } =
     useFavorites();
 
-  const orderedCategories = useMemo(
-    () =>
-      [...categories].sort((a, b) =>
-        a.name.localeCompare(b.name, "tr", { sensitivity: "base" })
-      ),
-    [categories]
-  );
-
-  const favoriteCategories = useMemo(
-    () => getFavoriteCategories(orderedCategories),
-    [orderedCategories, getFavoriteCategories]
-  );
-
+  // Favorites first, then the rest (categories arrive already sorted).
   const displayCategories = useMemo(() => {
-    if (showFavorites) {
-      return favoriteCategories;
-    }
-
-    const favorites = favoriteCategories;
-    const others = orderedCategories.filter(
-      (cat) => !favorites.some((fav) => fav.id === cat.id)
-    );
-
-    return [...favorites, ...others];
-  }, [showFavorites, favoriteCategories, orderedCategories]);
+    const favorites = getFavoriteCategories(categories);
+    if (showFavorites) return favorites;
+    return [...favorites, ...categories.filter((cat) => !favorites.includes(cat))];
+  }, [showFavorites, categories, getFavoriteCategories]);
 
   return (
-    <div className="flex h-full flex-col min-h-0">
-      {/* Header */}
-      <div className="flex-shrink-0 mb-3 sm:mb-4">
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <h2 className="text-base sm:text-lg font-semibold text-white">
-            Kategoriler
-          </h2>
-          <button
-            onClick={() => setShowFavorites(!showFavorites)}
-            className={clsx(
-              "rounded-md p-1 sm:p-1.5 transition-colors",
-              showFavorites
-                ? "bg-yellow-500/20 text-yellow-400"
-                : "bg-white/5 text-slate-400 hover:text-white"
-            )}
-            title={
-              showFavorites
-                ? "Tüm kategorileri göster"
-                : "Sadece favorileri göster"
-            }
-          >
-            {showFavorites ? (
-              <Star className="h-3 w-3 sm:h-4 sm:w-4" />
-            ) : (
-              <StarOff className="h-3 w-3 sm:h-4 sm:w-4" />
-            )}
-          </button>
-        </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          Kategoriler
+        </h2>
+        <button
+          onClick={() => setShowFavorites((v) => !v)}
+          aria-pressed={showFavorites}
+          className={clsx(
+            "flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition",
+            showFavorites
+              ? "bg-amber-400/15 text-amber-300"
+              : "text-slate-400 hover:bg-white/5 hover:text-white"
+          )}
+          title={showFavorites ? "Tüm kategorileri göster" : "Sadece favorileri göster"}
+        >
+          <Star className={clsx("h-3.5 w-3.5", showFavorites && "fill-current")} />
+          Favoriler
+        </button>
       </div>
 
-      {/* Categories List */}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-2 scrollbar-thin">
+      <div className="scrollbar-thin -mr-2 min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-2">
         {displayCategories.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-white/10 bg-white/5 p-4 text-center text-slate-400">
-            <p className="text-xs">
-              {showFavorites
-                ? "Henüz favori kategori yok"
-                : "Kategori bulunamadı"}
-            </p>
-          </div>
+          <p className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-slate-400">
+            {showFavorites
+              ? "Henüz favori kategori yok. Yıldıza dokunarak ekleyin."
+              : "Kategori bulunamadı"}
+          </p>
         ) : (
           displayCategories.map((category) => {
             const isSelected = selectedCategoryId === category.id;
@@ -96,46 +65,37 @@ export function CascaderMenu({
             return (
               <div
                 key={category.id}
-                className="flex items-center gap-1 min-w-0"
+                className={clsx(
+                  "group flex items-center rounded-xl transition",
+                  isSelected ? "bg-primary/15 ring-1 ring-primary/40" : "hover:bg-white/5"
+                )}
               >
                 <button
                   onClick={() => onCategorySelect(category.id)}
                   className={clsx(
-                    "flex-1 flex items-center gap-1 sm:gap-2 rounded-md border px-1.5 sm:px-2 py-1 sm:py-1.5 text-left text-xs font-medium transition-all min-w-0 overflow-hidden",
-                    isSelected
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-white/10 bg-white/5 text-slate-300 hover:border-primary/60 hover:text-primary"
+                    "flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm",
+                    isSelected ? "font-medium text-white" : "text-slate-300"
                   )}
                 >
-                  <span
-                    className="truncate flex-1 min-w-0"
-                    title={category.name}
-                  >
+                  <span className="min-w-0 flex-1 truncate" title={category.name}>
                     {category.name}
                   </span>
-                  <span className="text-xs text-slate-500 ml-auto flex-shrink-0">
-                    ({category.streams.length})
+                  <span className="shrink-0 text-xs tabular-nums text-slate-500">
+                    {category.streams.length}
                   </span>
                 </button>
-
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleCategoryFavorite(category.id);
-                  }}
+                  onClick={() => toggleCategoryFavorite(category.id)}
+                  aria-pressed={isFavorite}
                   className={clsx(
-                    "rounded-md p-0.5 sm:p-1 transition-colors",
+                    "mr-1 rounded-lg p-2 transition",
                     isFavorite
-                      ? "text-red-400 hover:text-red-300"
-                      : "text-slate-500 hover:text-slate-300"
+                      ? "text-amber-300"
+                      : "text-slate-600 hover:text-slate-300 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
                   )}
                   title={isFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
                 >
-                  {isFavorite ? (
-                    <Heart className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                  ) : (
-                    <HeartOff className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                  )}
+                  <Star className={clsx("h-3.5 w-3.5", isFavorite && "fill-current")} />
                 </button>
               </div>
             );
