@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* Tailwind v4 ignores tailwind.config.js unless @config is used; tokens live here. */
+@theme {
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #f8fafc;
+  --color-accent: #38bdf8;
+  --color-accent-foreground: #0f172a;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
+  --animate-fade-in: fade-in 0.25s ease-out 0.3s both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: rgb(2 6 23);
+  color: rgb(241 245 249);
+  min-height: 100dvh;
+  background-image:
+    radial-gradient(60rem 40rem at 10% -10%, rgba(59, 130, 246, 0.12), transparent 60%),
+    radial-gradient(50rem 30rem at 110% 110%, rgba(56, 189, 248, 0.08), transparent 60%);
+  -webkit-font-smoothing: antialiased;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+input[type="range"] {
+  accent-color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

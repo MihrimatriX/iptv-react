@@ -1,0 +1,27 @@
+services:
+  tv-service:
+    build: .
+    container_name: tv-service
+    ports:
+      - "3444:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Optional server-side defaults; users can also log in from the UI.
+      XTREAM_API_BASE: ${XTREAM_API_BASE:-}
+      XTREAM_USERNAME: ${XTREAM_USERNAME:-}
+      XTREAM_PASSWORD: ${XTREAM_PASSWORD:-}
+      XTREAM_SESSION_COOKIE: ${XTREAM_SESSION_COOKIE:-}
+      XTREAM_USER_AGENT: ${XTREAM_USER_AGENT:-Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0}
+    restart: unless-stopped
+    networks:
+      - proxy-network
+
+# Shared with the reverse proxy; create once with: docker network create proxy-network
+networks:
+  proxy-network:
+    driver: bridge
+    external: true
