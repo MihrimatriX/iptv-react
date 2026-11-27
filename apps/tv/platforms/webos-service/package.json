@@ -1,0 +1,6 @@
+{
+  "name": "com.afu.iptv.service",
+  "version": "1.0.0",
+  "description": "Fetches Xtream API responses for the app; packaged webOS apps can't make cross-origin requests themselves.",
+  "main": "index.js"
+}

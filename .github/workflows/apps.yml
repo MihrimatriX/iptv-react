@@ -1,0 +1,109 @@
+name: TV & desktop apps
+
+on:
+  pull_request:
+    paths: ["apps/tv/**", "packages/core/**", ".github/workflows/apps.yml"]
+  push:
+    branches: [main]
+    paths: ["apps/tv/**", "packages/core/**", ".github/workflows/apps.yml"]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      desktop:
+        description: "Also build the desktop installers (Windows, macOS, Linux)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tv:
+    name: Core tests, TV build, webOS + Tizen packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/tv/package-lock.json
+      - run: node --test packages/core/src/*.test.ts
+      - run: npm ci
+        working-directory: apps/tv
+      # tsc, vite build (Chromium 68 target) and an ES2019 syntax check
+      - run: npm run build
+        working-directory: apps/tv
+      # Remote-control walk-through of the built app from file://, as on a TV
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/tv
+      - run: npm run smoke -- smoke-shots
+        working-directory: apps/tv
+      - run: npm run package:webos
+        working-directory: apps/tv
+      # Unsigned: Samsung TVs only install .wgt files signed with your certificate
+      - run: npm run package:tizen
+        working-directory: apps/tv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv-packages
+          path: apps/tv/out/*
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tv-smoke-screenshots
+          path: apps/tv/smoke-shots/*.png
+
+  desktop:
+    name: Desktop (${{ matrix.platform }})
+    # macOS minutes are expensive: run on tags or when asked for.
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.desktop)
+    needs: tv
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: ubuntu-22.04
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/tv/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/tv/src-tauri -> target
+      - if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf \
+            gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
+      - run: npm ci
+        working-directory: apps/tv
+      - uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: apps/tv
+          args: ${{ matrix.args }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: |
+            apps/tv/src-tauri/target/**/release/bundle/**/*.msi
+            apps/tv/src-tauri/target/**/release/bundle/**/*.exe
+            apps/tv/src-tauri/target/**/release/bundle/**/*.dmg
+            apps/tv/src-tauri/target/**/release/bundle/**/*.AppImage
+            apps/tv/src-tauri/target/**/release/bundle/**/*.deb

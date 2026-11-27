@@ -1,0 +1,15 @@
+{
+  "id": "com.afu.iptv",
+  "version": "1.0.0",
+  "vendor": "AFU",
+  "type": "web",
+  "main": "index.html",
+  "title": "AFU IPTV",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "iconColor": "#3d7bff",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true,
+  "requiredMemory": 300,
+  "requiredACG": []
+}

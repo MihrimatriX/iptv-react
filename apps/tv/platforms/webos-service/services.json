@@ -1,0 +1,10 @@
+{
+  "id": "com.afu.iptv.service",
+  "description": "AFU IPTV network helper",
+  "services": [
+    {
+      "name": "com.afu.iptv.service",
+      "description": "HTTP GET without CORS for the AFU IPTV app"
+    }
+  ]
+}
