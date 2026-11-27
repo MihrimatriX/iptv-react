@@ -44,6 +44,16 @@ const SKIPPED_PROXY_HEADERS = new Set([
 // stream for as long as it needs (segments, continuous .ts).
 const UPSTREAM_HEADERS_TIMEOUT_MS = 15_000;
 const PROXY_PATH = "/api/proxy/stream";
+// Opt-in CORS so the TV/desktop apps can use this server as their proxy
+// (packaged webOS apps have no origin and are bound by CORS). Set to "*".
+const CORS_ORIGIN = process.env.STREAM_PROXY_CORS_ORIGIN?.trim() || null;
+const withCors = <T extends Response>(response: T): T => {
+  if (CORS_ORIGIN) {
+    response.headers.set("Access-Control-Allow-Origin", CORS_ORIGIN);
+    response.headers.set("Access-Control-Expose-Headers", "Content-Length, Content-Range");
+  }
+  return response;
+};
 const SESSION_COOKIE = process.env.XTREAM_SESSION_COOKIE ?? null;
 
 // SSRF guard: the proxy takes arbitrary URLs, so never let it reach
@@ -240,7 +250,21 @@ const rewritePlaylist = (
     .join(newline);
 };
 
+export function OPTIONS() {
+  const response = withCors(new NextResponse(null, { status: 204 }));
+  if (CORS_ORIGIN) {
+    response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    response.headers.set("Access-Control-Allow-Headers", "Range, Content-Type");
+    response.headers.set("Access-Control-Max-Age", "86400");
+  }
+  return response;
+}
+
 export async function GET(request: NextRequest) {
+  return withCors(await handleGet(request));
+}
+
+async function handleGet(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const streamUrl = searchParams.get("url");
   const refererParam = searchParams.get("referer");

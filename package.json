@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test src/lib/search.test.mjs"
+    "test": "node --test packages/core/src/*.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

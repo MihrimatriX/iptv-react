@@ -16,6 +16,7 @@
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
@@ -26,6 +27,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@iptv/core": [
+        "./packages/core/src/index.ts"
       ]
     }
   },
@@ -37,6 +41,7 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "apps"
   ]
 }
