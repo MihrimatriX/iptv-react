@@ -1,0 +1,13 @@
+{
+  "name": "@iptv/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform-free Xtream Codes client, EPG helpers, search and demo data shared by the web, TV and desktop apps.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test src/*.test.ts"
+  }
+}

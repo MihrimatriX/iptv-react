@@ -65,14 +65,37 @@ src/
   components/           LoginForm, ChannelBrowser, VideoPlayer, ...
   contexts/             Credentials and the demo session
   hooks/                useFavorites (one shared store)
-  lib/                  Xtream client, demo catalog, search, deploy flags
+  lib/                  Server-side Xtream client, deploy flags (re-exports from packages/core)
 public/                 manifest.json, service worker, icons
+packages/core/          Xtream client (live, movies, series, EPG), search, demo data; shared
+apps/tv/                LG webOS, Samsung Tizen and desktop (Tauri) app, Vite + React
 mobile/                 Flutter app for Android and iOS
 ```
 
 The proxy rewrites every URL inside a playlist to point back at itself, so segments go through it too and get the right Referer and User-Agent. It refuses loopback and private network addresses, and checks again on every redirect. A panel on your home LAN won't play through it for that reason.
 
 Credentials reach the server in a POST body, not in the URL, so they don't end up in access logs. Every page carries a `noindex` meta tag, and `robots.txt` blocks crawlers.
+
+## TV and desktop apps
+
+`apps/tv/` is a remote-first app for LG webOS 5+ and Samsung Tizen 5.5+ TVs, and
+the same build runs as a Windows/macOS/Linux app through Tauri 2. It adds movies,
+series, EPG (now/next and the schedule), search, resume and channel numbers on top
+of live TV, and talks to the panel without the Next.js server.
+
+```bash
+cd apps/tv
+npm install
+npm run dev                # browser, arrow keys + Enter
+npm run package:webos      # .ipk
+npm run package:tizen      # .wgt (sign with your Samsung certificate)
+npm run desktop:build      # desktop installers
+```
+
+Details, remote keys and how to install on a TV: [apps/tv/README.md](apps/tv/README.md).
+
+If a panel refuses the TV app (CORS), set `STREAM_PROXY_CORS_ORIGIN=*` on this
+web app and enter its address as the proxy on the TV's sign-in screen.
 
 ## Mobile app
 
